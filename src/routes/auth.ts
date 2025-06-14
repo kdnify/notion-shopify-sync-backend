@@ -124,10 +124,11 @@ router.get('/callback', async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('❌ Error in OAuth callback:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to complete OAuth flow',
-      details: process.env.NODE_ENV === 'development' ? error : undefined
+      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
     });
   }
 });
@@ -170,6 +171,27 @@ router.get('/install', (req: Request, res: Response) => {
   `;
   
   res.send(html);
+});
+
+/**
+ * GET /auth/debug
+ * Debug endpoint to check environment variables (development only)
+ */
+router.get('/debug', (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  res.json({
+    env: {
+      SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY ? '✅ Set' : '❌ Missing',
+      SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET ? '✅ Set' : '❌ Missing',
+      SHOPIFY_SCOPES: process.env.SHOPIFY_SCOPES || 'Using default',
+      SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL || '❌ Missing',
+      NODE_ENV: process.env.NODE_ENV || 'development'
+    },
+    shopifyServiceInitialized: !!shopifyService
+  });
 });
 
 export default router; 
