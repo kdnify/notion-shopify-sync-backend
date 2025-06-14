@@ -11,14 +11,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware with CSP configuration
+// Security middleware with CSP disabled for OAuth flow
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "form-action": ["'self'"],
-    },
-  },
+  contentSecurityPolicy: false,
 }));
 
 // Body parser middleware - Raw for webhook verification
