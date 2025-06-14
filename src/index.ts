@@ -11,8 +11,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet());
+// Security middleware with CSP configuration
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "form-action": ["'self'"],
+    },
+  },
+}));
 
 // Body parser middleware - Raw for webhook verification
 app.use('/webhooks', bodyParser.raw({ type: 'application/json' }));
