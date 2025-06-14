@@ -178,9 +178,10 @@ router.get('/install', (req: Request, res: Response) => {
  * Debug endpoint to check environment variables (development only)
  */
 router.get('/debug', (req: Request, res: Response) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(404).json({ error: 'Not found' });
-  }
+  // Temporarily allow in production for debugging
+  // if (process.env.NODE_ENV === 'production') {
+  //   return res.status(404).json({ error: 'Not found' });
+  // }
 
   res.json({
     env: {
