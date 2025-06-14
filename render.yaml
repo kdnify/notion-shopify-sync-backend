@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: notion-shopify-sync-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: notion-shopify-sync-backend
+          property: port
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false
+      - key: NOTION_TOKEN
+        sync: false
+      - key: NOTION_DB_ID
+        sync: false 
