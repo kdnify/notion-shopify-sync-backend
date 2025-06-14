@@ -137,10 +137,6 @@ router.get('/callback', async (req: Request, res: Response) => {
  * Simple installation page with shop input
  */
 router.get('/install', (req: Request, res: Response) => {
-  // Set proper CSP for embedded apps
-  const shop = req.query.shop || 'admin.shopify.com';
-  res.setHeader('Content-Security-Policy', `frame-ancestors https://admin.shopify.com https://${shop}; form-action 'self'`);
-  
   const html = `
     <!DOCTYPE html>
     <html>
