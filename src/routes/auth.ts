@@ -144,27 +144,12 @@ router.get('/callback', async (req: Request, res: Response) => {
     // Create session for user
     const sessionId = userStoreService.createSession(user.id);
 
-    // Success response with session
-    res.status(200).json({
-      success: true,
-      message: 'App installed successfully!',
-      data: {
-        shop: shopName,
-        shopName: shopInfo.name,
-        domain: shopInfo.domain,
-        webhook: {
-          id: webhook.webhook.id,
-          topic: webhook.webhook.topic,
-          address: webhook.webhook.address
-        },
-        user: {
-          id: user.id,
-          email: user.email,
-          totalStores: user.stores.filter(s => s.isActive).length
-        },
-        sessionId
-      }
-    });
+    // Redirect back to frontend with session ID
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const redirectUrl = `${frontendUrl}?sessionId=${sessionId}&success=true&shop=${shopName}`;
+    
+    console.log(`🔄 Redirecting to frontend: ${redirectUrl}`);
+    res.redirect(redirectUrl);
 
     console.log(`🎉 Successfully installed app for ${shopName} (User: ${user.id})`);
 
