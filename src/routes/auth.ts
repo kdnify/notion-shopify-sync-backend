@@ -195,4 +195,55 @@ router.get('/debug', (req: Request, res: Response) => {
   });
 });
 
+/**
+ * GET /auth/test-callback
+ * Test callback verification without making API calls
+ */
+router.get('/test-callback', (req: Request, res: Response) => {
+  try {
+    console.log('🧪 Testing callback verification:', req.query);
+
+    if (!shopifyService) {
+      return res.status(500).json({
+        error: 'Service Configuration Error',
+        message: 'Shopify service not properly configured'
+      });
+    }
+
+    const { shop, code, hmac, timestamp } = req.query;
+
+    // Check required parameters
+    if (!shop || !code || !hmac) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Missing required OAuth parameters',
+        received: { shop: !!shop, code: !!code, hmac: !!hmac }
+      });
+    }
+
+    // Test HMAC verification
+    const isValidHmac = shopifyService.verifyOAuthCallback(req.query);
+    
+    res.json({
+      success: true,
+      message: 'Callback verification test',
+      data: {
+        shop: shop,
+        code: code ? 'Present' : 'Missing',
+        hmac: hmac ? 'Present' : 'Missing',
+        timestamp: timestamp,
+        hmacValid: isValidHmac
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in test callback:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Test callback failed',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 
