@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ShopifyService } from '../services/shopify';
+import { userStoreService } from '../services/userStore';
 
 const router = Router();
 
@@ -15,10 +16,11 @@ try {
 /**
  * GET /auth
  * Initiates OAuth flow - redirects shop to Shopify OAuth
+ * Query params: shop, email?, notionToken?, notionDbId?
  */
 router.get('/', (req: Request, res: Response) => {
   try {
-    const { shop } = req.query;
+    const { shop, email, notionToken, notionDbId } = req.query;
 
     if (!shop || typeof shop !== 'string') {
       return res.status(400).json({
@@ -37,8 +39,15 @@ router.get('/', (req: Request, res: Response) => {
     // Clean shop name (remove .myshopify.com if present)
     const shopName = shop.replace('.myshopify.com', '');
     
-    // Generate OAuth URL
-    const authUrl = shopifyService.generateAuthUrl(shopName);
+    // Store user info in state for callback
+    const state = JSON.stringify({
+      email: email || '',
+      notionToken: notionToken || process.env.NOTION_TOKEN || '',
+      notionDbId: notionDbId || process.env.NOTION_DB_ID || ''
+    });
+    
+    // Generate OAuth URL with state
+    const authUrl = shopifyService.generateAuthUrl(shopName, state);
     
     console.log(`🔐 Redirecting ${shopName} to OAuth: ${authUrl}`);
     
@@ -92,6 +101,28 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     const shopName = (shop as string).replace('.myshopify.com', '');
 
+    // Parse state to get user info
+    let userInfo = { email: '', notionToken: '', notionDbId: '' };
+    if (state && typeof state === 'string') {
+      try {
+        userInfo = JSON.parse(state);
+      } catch (e) {
+        console.warn('Failed to parse state:', e);
+      }
+    }
+
+    // Use fallback values if not provided
+    const email = userInfo.email || `user-${shopName}@shopify.local`;
+    const notionToken = userInfo.notionToken || process.env.NOTION_TOKEN || '';
+    const notionDbId = userInfo.notionDbId || process.env.NOTION_DB_ID || '';
+
+    if (!notionToken || !notionDbId) {
+      return res.status(400).json({
+        error: 'Configuration Error',
+        message: 'Notion token and database ID are required'
+      });
+    }
+
     // Exchange code for access token
     const accessToken = await shopifyService.getAccessToken(shopName, code as string);
     console.log(`🔑 Got access token for ${shopName}`);
@@ -100,11 +131,20 @@ router.get('/callback', async (req: Request, res: Response) => {
     const shopInfo = await shopifyService.getShopInfo(shopName, accessToken);
     console.log(`🏪 Shop info: ${shopInfo.name} (${shopInfo.domain})`);
 
+    // Create or get user
+    const user = userStoreService.createOrGetUser(email, notionToken, notionDbId);
+    
+    // Add store to user
+    userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
+
     // Create order webhook
     const webhook = await shopifyService.createOrderWebhook(shopName, accessToken);
     console.log(`🎯 Created webhook with ID: ${webhook.webhook.id}`);
 
-    // Success response - in a real app you'd store the access token securely
+    // Create session for user
+    const sessionId = userStoreService.createSession(user.id);
+
+    // Success response with session
     res.status(200).json({
       success: true,
       message: 'App installed successfully!',
@@ -116,11 +156,17 @@ router.get('/callback', async (req: Request, res: Response) => {
           id: webhook.webhook.id,
           topic: webhook.webhook.topic,
           address: webhook.webhook.address
-        }
+        },
+        user: {
+          id: user.id,
+          email: user.email,
+          totalStores: user.stores.filter(s => s.isActive).length
+        },
+        sessionId
       }
     });
 
-    console.log(`🎉 Successfully installed app for ${shopName}`);
+    console.log(`🎉 Successfully installed app for ${shopName} (User: ${user.id})`);
 
   } catch (error) {
     console.error('❌ Error in OAuth callback:', error);
@@ -135,6 +181,125 @@ router.get('/callback', async (req: Request, res: Response) => {
 
 
 
+/**
+ * GET /auth/dashboard
+ * Get user dashboard with all connected stores
+ */
+router.get('/dashboard', (req: Request, res: Response) => {
+  try {
+    const sessionId = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!sessionId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Session ID required'
+      });
+    }
 
+    const user = userStoreService.getUserBySession(sessionId);
+    if (!user) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired session'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          createdAt: user.createdAt,
+          notionDbId: user.notionDbId
+        },
+        stores: user.stores.filter(s => s.isActive).map(store => ({
+          shopName: store.shopName,
+          shopDomain: store.shopDomain,
+          connectedAt: store.connectedAt,
+          isActive: store.isActive
+        })),
+        stats: {
+          totalStores: user.stores.filter(s => s.isActive).length,
+          totalConnections: user.stores.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting dashboard:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to get dashboard'
+    });
+  }
+});
+
+/**
+ * DELETE /auth/store/:shopName
+ * Remove a store from user's account
+ */
+router.delete('/store/:shopName', (req: Request, res: Response) => {
+  try {
+    const sessionId = req.headers.authorization?.replace('Bearer ', '');
+    const { shopName } = req.params;
+    
+    if (!sessionId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Session ID required'
+      });
+    }
+
+    const user = userStoreService.getUserBySession(sessionId);
+    if (!user) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired session'
+      });
+    }
+
+    const removed = userStoreService.removeStoreFromUser(user.id, shopName);
+    
+    if (removed) {
+      res.json({
+        success: true,
+        message: `Store ${shopName} removed successfully`
+      });
+    } else {
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'Store not found'
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error removing store:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to remove store'
+    });
+  }
+});
+
+/**
+ * GET /auth/stats
+ * Get system stats
+ */
+router.get('/stats', (req: Request, res: Response) => {
+  try {
+    const stats = userStoreService.getStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('❌ Error getting stats:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to get stats'
+    });
+  }
+});
 
 export default router; 

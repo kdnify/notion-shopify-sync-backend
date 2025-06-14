@@ -5,16 +5,16 @@ export class NotionService {
   private notion: Client;
   private databaseId: string;
 
-  constructor() {
-    const notionToken = process.env.NOTION_TOKEN;
-    const databaseId = process.env.NOTION_DB_ID;
+  constructor(customToken?: string, customDatabaseId?: string) {
+    const notionToken = customToken || process.env.NOTION_TOKEN;
+    const databaseId = customDatabaseId || process.env.NOTION_DB_ID;
 
     if (!notionToken) {
-      throw new Error('NOTION_TOKEN environment variable is required');
+      throw new Error('NOTION_TOKEN environment variable or custom token is required');
     }
 
     if (!databaseId) {
-      throw new Error('NOTION_DB_ID environment variable is required');
+      throw new Error('NOTION_DB_ID environment variable or custom database ID is required');
     }
 
     this.notion = new Client({

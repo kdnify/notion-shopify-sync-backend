@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { verifyShopifyWebhook, ShopifyOrder } from '../utils/verifyShopify';
 import { NotionService } from '../services/notion';
+import { userStoreService } from '../services/userStore';
 
 const router = Router();
 
@@ -86,22 +87,88 @@ router.post('/orders', async (req: Request, res: Response) => {
     }
 
     console.log(`📝 Processing order #${orderData.order_number} (ID: ${orderData.id})`);
-    console.log(`👤 Customer: ${orderData.customer.first_name} ${orderData.customer.last_name}`);
+    console.log(`👤 Customer: ${orderData.customer?.first_name} ${orderData.customer?.last_name}`);
     console.log(`💰 Total: ${orderData.currency} ${orderData.total_price}`);
 
-    // Create the page in Notion
-    const notionPageId = await notionService.createOrderPage(orderData);
+    // Extract shop name from order data or headers
+    const shopDomain = req.headers['x-shopify-shop-domain'] as string || 
+                      'unknown-shop';
+    const shopName = shopDomain.replace('.myshopify.com', '');
 
-    console.log(`🎉 Successfully synced order #${orderData.order_number} to Notion`);
+    console.log(`🏪 Processing order for shop: ${shopName}`);
+
+    // Find all users who have this store connected
+    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      console.warn(`⚠️ No users found with store ${shopName} connected`);
+      // Still process with default Notion service for backward compatibility
+      if (notionService) {
+        const notionPageId = await notionService.createOrderPage(orderData);
+        return res.status(200).json({
+          success: true,
+          message: 'Order synced to default Notion database',
+          data: {
+            orderId: orderData.id,
+            orderNumber: orderData.order_number,
+            notionPageId: notionPageId,
+            syncedToUsers: 0
+          }
+        });
+      } else {
+        return res.status(404).json({
+          error: 'No Configuration Found',
+          message: 'No users have this store connected and no default configuration available'
+        });
+      }
+    }
+
+    // Sync to all users' Notion databases
+    const syncResults = [];
+    for (const { user, store } of usersWithStore) {
+      try {
+        console.log(`📊 Syncing to user ${user.email} (${user.id})`);
+        
+        // Create Notion service for this user
+        const userNotionService = new NotionService(user.notionToken, user.notionDbId);
+        
+        // Create the page in user's Notion database
+        const notionPageId = await userNotionService.createOrderPage(orderData);
+        
+        syncResults.push({
+          userId: user.id,
+          userEmail: user.email,
+          notionPageId: notionPageId,
+          success: true
+        });
+        
+        console.log(`✅ Synced to ${user.email}'s Notion database`);
+        
+      } catch (userError) {
+        console.error(`❌ Failed to sync to user ${user.email}:`, userError);
+        syncResults.push({
+          userId: user.id,
+          userEmail: user.email,
+          success: false,
+          error: userError instanceof Error ? userError.message : String(userError)
+        });
+      }
+    }
+
+    const successfulSyncs = syncResults.filter(r => r.success).length;
+    console.log(`🎉 Successfully synced order #${orderData.order_number} to ${successfulSyncs}/${syncResults.length} users`);
 
     // Send success response
     res.status(200).json({
       success: true,
-      message: 'Order successfully synced to Notion',
+      message: `Order successfully synced to ${successfulSyncs} Notion database(s)`,
       data: {
         orderId: orderData.id,
         orderNumber: orderData.order_number,
-        notionPageId: notionPageId
+        shopName: shopName,
+        syncedToUsers: successfulSyncs,
+        totalUsers: syncResults.length,
+        syncResults: syncResults
       }
     });
 
