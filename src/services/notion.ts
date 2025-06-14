@@ -164,10 +164,19 @@ export class NotionService {
         database_id: this.databaseId,
       });
       
-      console.log(`✅ Connected to Notion database: ${(response as any).title?.[0]?.plain_text || 'Untitled'}`);
+      // Extract database title safely
+      let dbTitle = 'Database';
+      if (response && 'title' in response && Array.isArray(response.title) && response.title.length > 0) {
+        dbTitle = response.title[0].plain_text || 'Database';
+      }
+      
+      console.log(`✅ Connected to Notion database: ${dbTitle}`);
+      console.log(`📊 Database ID: ${this.databaseId}`);
       return true;
     } catch (error) {
-      console.error('❌ Failed to connect to Notion:', error);
+      console.error('❌ Failed to connect to Notion:');
+      console.error('Database ID:', this.databaseId);
+      console.error('Error:', error);
       return false;
     }
   }
