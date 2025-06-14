@@ -117,10 +117,10 @@ router.get('/callback', async (req: Request, res: Response) => {
     const notionDbId = userInfo.notionDbId || process.env.NOTION_DB_ID || '';
 
     if (!notionToken || !notionDbId) {
-      return res.status(400).json({
-        error: 'Configuration Error',
-        message: 'Notion token and database ID are required'
-      });
+      console.error('❌ Missing Notion configuration');
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+      const errorUrl = `${frontendUrl}?error=${encodeURIComponent('Notion configuration missing. Please contact support.')}&shop=${shopName}`;
+      return res.redirect(errorUrl);
     }
 
     // Exchange code for access token
@@ -145,8 +145,8 @@ router.get('/callback', async (req: Request, res: Response) => {
     const sessionId = userStoreService.createSession(user.id);
 
     // Redirect back to frontend with session ID
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const redirectUrl = `${frontendUrl}?sessionId=${sessionId}&success=true&shop=${shopName}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const redirectUrl = `${frontendUrl}?success=true&shop=${shopName}`;
     
     console.log(`🔄 Redirecting to frontend: ${redirectUrl}`);
     res.redirect(redirectUrl);
@@ -156,11 +156,14 @@ router.get('/callback', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('❌ Error in OAuth callback:', error);
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to complete OAuth flow',
-      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
-    });
+    
+    // Redirect to frontend with error instead of returning JSON
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const shopName = req.query.shop ? (req.query.shop as string).replace('.myshopify.com', '') : 'unknown';
+    const errorMessage = error instanceof Error ? error.message : 'Failed to complete OAuth flow';
+    const errorUrl = `${frontendUrl}?error=${encodeURIComponent(errorMessage)}&shop=${shopName}`;
+    
+    res.redirect(errorUrl);
   }
 });
 
