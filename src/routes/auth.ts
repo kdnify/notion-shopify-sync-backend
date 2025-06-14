@@ -137,9 +137,14 @@ router.get('/callback', async (req: Request, res: Response) => {
     // Add store to user
     userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
 
-    // Create order webhook
-    const webhook = await shopifyService.createOrderWebhook(shopName, accessToken);
-    console.log(`🎯 Created webhook with ID: ${webhook.webhook.id}`);
+    // Create order webhook (non-blocking)
+    try {
+      const webhook = await shopifyService.createOrderWebhook(shopName, accessToken);
+      console.log(`🎯 Created webhook with ID: ${webhook.webhook.id}`);
+    } catch (webhookError) {
+      console.warn(`⚠️ Failed to create webhook for ${shopName}:`, webhookError instanceof Error ? webhookError.message : webhookError);
+      // Continue with the flow even if webhook creation fails
+    }
 
     // Create session for user
     const sessionId = userStoreService.createSession(user.id);

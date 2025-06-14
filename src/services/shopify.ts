@@ -26,8 +26,12 @@ export class ShopifyService {
     this.scopes = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders';
     this.appUrl = process.env.SHOPIFY_APP_URL || '';
 
-    if (!this.apiKey || !this.apiSecret || !this.appUrl) {
-      throw new Error('Missing required Shopify environment variables');
+    if (!this.apiKey || !this.apiSecret) {
+      throw new Error('Missing required Shopify API credentials (SHOPIFY_API_KEY, SHOPIFY_API_SECRET)');
+    }
+    
+    if (!this.appUrl) {
+      console.warn('⚠️ SHOPIFY_APP_URL not set - webhook creation will fail');
     }
   }
 
@@ -82,6 +86,10 @@ export class ShopifyService {
    */
   async createOrderWebhook(shop: string, accessToken: string): Promise<WebhookCreationResponse> {
     try {
+      if (!this.appUrl) {
+        throw new Error('SHOPIFY_APP_URL environment variable is required for webhook creation');
+      }
+
       const webhookData = {
         webhook: {
           topic: 'orders/create',
