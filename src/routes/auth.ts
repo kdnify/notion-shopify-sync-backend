@@ -133,76 +133,7 @@ router.get('/callback', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /auth/install
- * Installation page with JavaScript-based shop input (no form submission)
- */
-router.get('/install', (req: Request, res: Response) => {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Install NotionSync</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
-            .form-group { margin-bottom: 20px; }
-            input { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; }
-            button { background: #5865f2; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; }
-            button:hover { background: #4752c4; }
-            .info { background: #f0f8ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-            .direct-link { background: #e8f5e8; padding: 15px; border-radius: 4px; margin-top: 20px; }
-            .direct-link a { color: #2d5a2d; text-decoration: none; font-weight: bold; }
-        </style>
-    </head>
-    <body>
-        <h1>Install NotionSync</h1>
-        <div class="info">
-            <p>This app will sync your Shopify orders to Notion automatically.</p>
-            <p>Enter your shop domain below to begin installation.</p>
-        </div>
-        
-        <div class="form-group">
-            <label for="shop">Shop Domain:</label>
-            <input type="text" id="shop" placeholder="your-shop-name" required>
-            <small>Enter just the shop name (without .myshopify.com)</small>
-        </div>
-        <button onclick="installApp()">Install App</button>
-        
-        <div class="direct-link">
-            <p><strong>Quick Install:</strong> If you know your shop name, you can also use this direct link format:</p>
-            <p><code>https://notion-shopify-sync-backend.onrender.com/auth?shop=YOUR_SHOP_NAME</code></p>
-        </div>
 
-        <script>
-            function installApp() {
-                const shopInput = document.getElementById('shop');
-                const shop = shopInput.value.trim();
-                
-                if (!shop) {
-                    alert('Please enter your shop name');
-                    return;
-                }
-                
-                // Clean shop name (remove .myshopify.com if present)
-                const cleanShop = shop.replace('.myshopify.com', '');
-                
-                // Redirect directly to OAuth (no form submission)
-                window.location.href = '/auth?shop=' + encodeURIComponent(cleanShop);
-            }
-            
-            // Allow Enter key to trigger installation
-            document.getElementById('shop').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    installApp();
-                }
-            });
-        </script>
-    </body>
-    </html>
-  `;
-  
-  res.send(html);
-});
 
 
 

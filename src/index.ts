@@ -39,7 +39,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
         <ul>
           <li><a href="/health">🏥 Health Check</a></li>
           <li><a href="/webhooks/test">🧪 Webhook Test</a></li>
-          <li><a href="/auth/install">📦 Install App</a></li>
+          <li><code>/auth?shop=YOUR_SHOP_NAME</code> - OAuth Installation</li>
         </ul>
         <h3>📋 Integration Status:</h3>
         <p>✅ Server Running<br/>
