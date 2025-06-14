@@ -142,28 +142,55 @@ export class ShopifyService {
    * Verifies the OAuth callback request
    */
   verifyOAuthCallback(query: any): boolean {
-    const { hmac, ...queryWithoutHmac } = query;
-    
-    if (!hmac) {
+    try {
+      const { hmac, ...queryWithoutHmac } = query;
+      
+      if (!hmac) {
+        console.log('❌ No HMAC provided');
+        return false;
+      }
+
+      // Sort query parameters and create query string
+      const sortedParams = Object.keys(queryWithoutHmac)
+        .sort()
+        .map(key => `${key}=${queryWithoutHmac[key]}`)
+        .join('&');
+
+      console.log('🔍 Query string for HMAC:', sortedParams);
+
+      // Generate HMAC
+      const computedHmac = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(sortedParams)
+        .digest('hex');
+
+      console.log('🔍 Computed HMAC:', computedHmac);
+      console.log('🔍 Received HMAC:', hmac);
+
+      // Ensure both HMACs are the same length
+      if (hmac.length !== computedHmac.length) {
+        console.log('❌ HMAC length mismatch:', hmac.length, 'vs', computedHmac.length);
+        return false;
+      }
+
+      // Validate hex format
+      if (!/^[0-9a-fA-F]+$/.test(hmac) || !/^[0-9a-fA-F]+$/.test(computedHmac)) {
+        console.log('❌ Invalid hex format');
+        return false;
+      }
+
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(hmac, 'hex'),
+        Buffer.from(computedHmac, 'hex')
+      );
+
+      console.log('🔍 HMAC verification result:', isValid);
+      return isValid;
+
+    } catch (error) {
+      console.error('❌ Error in HMAC verification:', error);
       return false;
     }
-
-    // Sort query parameters and create query string
-    const sortedParams = Object.keys(queryWithoutHmac)
-      .sort()
-      .map(key => `${key}=${queryWithoutHmac[key]}`)
-      .join('&');
-
-    // Generate HMAC
-    const computedHmac = crypto
-      .createHmac('sha256', this.apiSecret)
-      .update(sortedParams)
-      .digest('hex');
-
-    return crypto.timingSafeEqual(
-      Buffer.from(hmac, 'hex'),
-      Buffer.from(computedHmac, 'hex')
-    );
   }
 
   /**
