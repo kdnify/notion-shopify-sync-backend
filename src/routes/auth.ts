@@ -135,7 +135,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 
 /**
  * GET /auth/install
- * Simple installation page with shop input
+ * Installation page with JavaScript-based shop input (no form submission)
  */
 router.get('/install', (req: Request, res: Response) => {
   const html = `
@@ -150,6 +150,8 @@ router.get('/install', (req: Request, res: Response) => {
             button { background: #5865f2; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; }
             button:hover { background: #4752c4; }
             .info { background: #f0f8ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+            .direct-link { background: #e8f5e8; padding: 15px; border-radius: 4px; margin-top: 20px; }
+            .direct-link a { color: #2d5a2d; text-decoration: none; font-weight: bold; }
         </style>
     </head>
     <body>
@@ -158,14 +160,43 @@ router.get('/install', (req: Request, res: Response) => {
             <p>This app will sync your Shopify orders to Notion automatically.</p>
             <p>Enter your shop domain below to begin installation.</p>
         </div>
-        <form action="/auth" method="get">
-            <div class="form-group">
-                <label for="shop">Shop Domain:</label>
-                <input type="text" id="shop" name="shop" placeholder="your-shop-name" required>
-                <small>Enter just the shop name (without .myshopify.com)</small>
-            </div>
-            <button type="submit">Install App</button>
-        </form>
+        
+        <div class="form-group">
+            <label for="shop">Shop Domain:</label>
+            <input type="text" id="shop" placeholder="your-shop-name" required>
+            <small>Enter just the shop name (without .myshopify.com)</small>
+        </div>
+        <button onclick="installApp()">Install App</button>
+        
+        <div class="direct-link">
+            <p><strong>Quick Install:</strong> If you know your shop name, you can also use this direct link format:</p>
+            <p><code>https://notion-shopify-sync-backend.onrender.com/auth?shop=YOUR_SHOP_NAME</code></p>
+        </div>
+
+        <script>
+            function installApp() {
+                const shopInput = document.getElementById('shop');
+                const shop = shopInput.value.trim();
+                
+                if (!shop) {
+                    alert('Please enter your shop name');
+                    return;
+                }
+                
+                // Clean shop name (remove .myshopify.com if present)
+                const cleanShop = shop.replace('.myshopify.com', '');
+                
+                // Redirect directly to OAuth (no form submission)
+                window.location.href = '/auth?shop=' + encodeURIComponent(cleanShop);
+            }
+            
+            // Allow Enter key to trigger installation
+            document.getElementById('shop').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    installApp();
+                }
+            });
+        </script>
     </body>
     </html>
   `;
@@ -173,77 +204,6 @@ router.get('/install', (req: Request, res: Response) => {
   res.send(html);
 });
 
-/**
- * GET /auth/debug
- * Debug endpoint to check environment variables (development only)
- */
-router.get('/debug', (req: Request, res: Response) => {
-  // Temporarily allow in production for debugging
-  // if (process.env.NODE_ENV === 'production') {
-  //   return res.status(404).json({ error: 'Not found' });
-  // }
 
-  res.json({
-    env: {
-      SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY ? '✅ Set' : '❌ Missing',
-      SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET ? '✅ Set' : '❌ Missing',
-      SHOPIFY_SCOPES: process.env.SHOPIFY_SCOPES || 'Using default',
-      SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL || '❌ Missing',
-      NODE_ENV: process.env.NODE_ENV || 'development'
-    },
-    shopifyServiceInitialized: !!shopifyService
-  });
-});
-
-/**
- * GET /auth/test-callback
- * Test callback verification without making API calls
- */
-router.get('/test-callback', (req: Request, res: Response) => {
-  try {
-    console.log('🧪 Testing callback verification:', req.query);
-
-    if (!shopifyService) {
-      return res.status(500).json({
-        error: 'Service Configuration Error',
-        message: 'Shopify service not properly configured'
-      });
-    }
-
-    const { shop, code, hmac, timestamp } = req.query;
-
-    // Check required parameters
-    if (!shop || !code || !hmac) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Missing required OAuth parameters',
-        received: { shop: !!shop, code: !!code, hmac: !!hmac }
-      });
-    }
-
-    // Test HMAC verification
-    const isValidHmac = shopifyService.verifyOAuthCallback(req.query);
-    
-    res.json({
-      success: true,
-      message: 'Callback verification test',
-      data: {
-        shop: shop,
-        code: code ? 'Present' : 'Missing',
-        hmac: hmac ? 'Present' : 'Missing',
-        timestamp: timestamp,
-        hmacValid: isValidHmac
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error in test callback:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Test callback failed',
-      details: error instanceof Error ? error.message : String(error)
-    });
-  }
-});
 
 export default router; 

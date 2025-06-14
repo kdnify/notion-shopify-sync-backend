@@ -156,16 +156,11 @@ export class ShopifyService {
         .map(key => `${key}=${queryWithoutHmac[key]}`)
         .join('&');
 
-      console.log('🔍 Query string for HMAC:', sortedParams);
-
       // Generate HMAC
       const computedHmac = crypto
         .createHmac('sha256', this.apiSecret)
         .update(sortedParams)
         .digest('hex');
-
-      console.log('🔍 Computed HMAC:', computedHmac);
-      console.log('🔍 Received HMAC:', hmac);
 
       // Ensure both HMACs are the same length
       if (hmac.length !== computedHmac.length) {
@@ -184,7 +179,6 @@ export class ShopifyService {
         Buffer.from(computedHmac, 'hex')
       );
 
-      console.log('🔍 HMAC verification result:', isValid);
       return isValid;
 
     } catch (error) {
