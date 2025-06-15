@@ -79,15 +79,14 @@ export class NotionService {
       Object.entries(database.properties as any).forEach(([propName, propConfig]: [string, any]) => {
         if (propConfig.type === 'title') return; // Already handled above
         
-        const propNameLower = propName.toLowerCase();
         console.log(`🔍 Checking property: ${propName} (type: ${propConfig.type})`);
         
-        // Try to match common property names and types
-        switch (propConfig.type) {
-          case 'rich_text':
-            if ((propNameLower.includes('customer') || propNameLower.includes('name')) && order.customer) {
+        // Map to exact property names in the user's database
+        switch (propName) {
+          case 'Customer Name':
+            if (order.customer) {
               const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim();
-              if (customerName) {
+              if (customerName && customerName !== 'Manual Order No Customer') {
                 properties[propName] = {
                   rich_text: [
                     {
@@ -97,31 +96,33 @@ export class NotionService {
                     },
                   ],
                 };
-                console.log(`📝 Setting customer name "${propName}" to: ${customerName}`);
+                console.log(`📝 Setting "${propName}" to: ${customerName}`);
               }
-            } else if (propNameLower.includes('email') && order.customer?.email) {
+            }
+            break;
+            
+          case 'Customer Email':
+            if (order.customer?.email && order.customer.email !== 'no-email@manual-order.com') {
               properties[propName] = {
-                rich_text: [
-                  {
-                    text: {
-                      content: order.customer.email,
-                    },
-                  },
-                ],
+                email: order.customer.email,
               };
-              console.log(`📝 Setting email "${propName}" to: ${order.customer.email}`);
-            } else if ((propNameLower.includes('line') || propNameLower.includes('item') || propNameLower.includes('product')) && lineItemsText) {
+              console.log(`📝 Setting "${propName}" to: ${order.customer.email}`);
+            }
+            break;
+            
+          case 'Order Date':
+            if (order.created_at) {
               properties[propName] = {
-                rich_text: [
-                  {
-                    text: {
-                      content: lineItemsText,
-                    },
-                  },
-                ],
+                date: {
+                  start: order.created_at,
+                },
               };
-              console.log(`📝 Setting items "${propName}" to: ${lineItemsText}`);
-            } else if ((propNameLower.includes('address') || propNameLower.includes('shipping')) && order.shipping_address) {
+              console.log(`📝 Setting "${propName}" to: ${order.created_at}`);
+            }
+            break;
+            
+          case 'Shipping Address':
+            if (order.shipping_address) {
               const address = order.shipping_address;
               const addressText = [
                 address.first_name,
@@ -134,17 +135,23 @@ export class NotionService {
                 address.country
               ].filter(Boolean).join(', ');
               
-              properties[propName] = {
-                rich_text: [
-                  {
-                    text: {
-                      content: addressText || 'No Address',
+              if (addressText) {
+                properties[propName] = {
+                  rich_text: [
+                    {
+                      text: {
+                        content: addressText,
+                      },
                     },
-                  },
-                ],
-              };
-              console.log(`📝 Setting address "${propName}" to: ${addressText}`);
-            } else if (propNameLower.includes('note') && order.note) {
+                  ],
+                };
+                console.log(`📝 Setting "${propName}" to: ${addressText}`);
+              }
+            }
+            break;
+            
+          case 'Notes':
+            if (order.note) {
               properties[propName] = {
                 rich_text: [
                   {
@@ -154,156 +161,88 @@ export class NotionService {
                   },
                 ],
               };
-              console.log(`📝 Setting notes "${propName}" to: ${order.note}`);
+              console.log(`📝 Setting "${propName}" to: ${order.note}`);
             }
             break;
-          
-          case 'number':
-            if ((propNameLower.includes('total') || propNameLower.includes('price')) && order.total_price) {
+            
+          case 'Items Purchased':
+            if (lineItemsText) {
+              properties[propName] = {
+                rich_text: [
+                  {
+                    text: {
+                      content: lineItemsText,
+                    },
+                  },
+                ],
+              };
+              console.log(`📝 Setting "${propName}" to: ${lineItemsText}`);
+            }
+            break;
+            
+          case 'Total Price':
+            if (order.total_price) {
               const totalPrice = parseFloat(order.total_price);
               if (!isNaN(totalPrice)) {
                 properties[propName] = {
                   number: totalPrice,
                 };
-                console.log(`📝 Setting total price "${propName}" to: ${totalPrice}`);
+                console.log(`📝 Setting "${propName}" to: ${totalPrice}`);
               }
-            } else if ((propNameLower.includes('order') && propNameLower.includes('id')) && order.id) {
-              properties[propName] = {
-                number: parseInt(order.id.toString()) || 0,
-              };
-              console.log(`📝 Setting order ID "${propName}" to: ${order.id}`);
-            } else if ((propNameLower.includes('order') && propNameLower.includes('number')) && order.order_number) {
-              properties[propName] = {
-                number: order.order_number || 0,
-              };
-              console.log(`📝 Setting order number "${propName}" to: ${order.order_number}`);
-            }
-            break;
-          
-          case 'date':
-            if ((propNameLower.includes('created') || propNameLower.includes('date') || propNameLower.includes('order')) && order.created_at) {
-              properties[propName] = {
-                date: {
-                  start: order.created_at,
-                },
-              };
-              console.log(`📝 Setting date "${propName}" to: ${order.created_at}`);
-            }
-            break;
-          
-          case 'select':
-            if (propNameLower.includes('currency') && order.currency) {
-              properties[propName] = {
-                select: {
-                  name: order.currency || 'USD',
-                },
-              };
-              console.log(`📝 Setting currency "${propName}" to: ${order.currency}`);
-            } else if (propNameLower.includes('status')) {
-              // Check for fulfillment status first, then financial status
-              let statusValue = 'pending';
-              if (order.fulfillment_status) {
-                statusValue = order.fulfillment_status;
-              } else if (order.financial_status) {
-                statusValue = order.financial_status;
-              }
-              
-              properties[propName] = {
-                select: {
-                  name: statusValue,
-                },
-              };
-              console.log(`📝 Setting status "${propName}" to: ${statusValue} (fulfillment: ${order.fulfillment_status}, financial: ${order.financial_status})`);
             }
             break;
             
-          case 'status':
-            if (propNameLower.includes('status')) {
-              // Handle Notion's status field type (different from select)
-              // Map from your n8n workflow's capitalized values to Notion status values
-              let statusValue = 'Unfulfilled'; // Default to Unfulfilled (capitalized for Notion)
-              
-              if (order.fulfillment_status) {
-                const fulfillmentStatus = order.fulfillment_status.toLowerCase();
-                // Map common fulfillment statuses to proper Notion status values
-                switch (fulfillmentStatus) {
-                  case 'fulfilled':
-                    statusValue = 'Fulfilled';
-                    break;
-                  case 'partially_fulfilled':
-                  case 'partially fulfilled':
-                    statusValue = 'Partially Fulfilled';
-                    break;
-                  case 'in_progress':
-                  case 'in progress':
-                    statusValue = 'In Progress';
-                    break;
-                  case 'on_hold':
-                  case 'on hold':
-                    statusValue = 'On Hold';
-                    break;
-                  case 'scheduled':
-                    statusValue = 'Scheduled';
-                    break;
-                  case 'restocked':
-                    statusValue = 'Restocked';
-                    break;
-                  case 'unfulfilled':
-                  case 'open':
-                  default:
-                    statusValue = 'Unfulfilled';
-                    break;
-                }
-              } else if (order.financial_status) {
-                // Fallback to financial status if no fulfillment status
-                const financialStatus = order.financial_status.toLowerCase();
-                switch (financialStatus) {
-                  case 'paid':
-                    statusValue = 'Fulfilled';
-                    break;
-                  case 'pending':
-                  case 'authorized':
-                  default:
-                    statusValue = 'Unfulfilled';
-                    break;
-                }
-              }
-              
-              properties[propName] = {
-                status: {
-                  name: statusValue,
-                },
-              };
-              console.log(`📝 Setting status field "${propName}" to: ${statusValue} (fulfillment: ${order.fulfillment_status}, financial: ${order.financial_status})`);
-            }
+          case 'Order Status':
+            // This is a status field, need to set the proper status
+            const status = order.fulfillment_status || 'unfulfilled';
+            // Map common statuses to what might be in your database
+            const statusMap: { [key: string]: string } = {
+              'unfulfilled': 'Unfulfilled',
+              'fulfilled': 'Fulfilled', 
+              'partial': 'Partially Fulfilled',
+              'pending': 'Pending'
+            };
+            
+            const mappedStatus = statusMap[status.toLowerCase()] || 'Unfulfilled';
+            properties[propName] = {
+              status: {
+                name: mappedStatus,
+              },
+            };
+            console.log(`📝 Setting "${propName}" to: ${mappedStatus}`);
             break;
             
-          case 'email':
-            if (propNameLower.includes('email') && order.customer?.email) {
-              properties[propName] = {
-                email: order.customer.email,
-              };
-              console.log(`📝 Setting email field "${propName}" to: ${order.customer.email}`);
-            }
-            break;
-            
-          case 'url':
-            if ((propNameLower.includes('shopify') || propNameLower.includes('link')) && order.order_status_url) {
+          case 'Shopify Admin Link':
+            if (order.order_status_url) {
               properties[propName] = {
                 url: order.order_status_url,
               };
-              console.log(`📝 Setting URL "${propName}" to: ${order.order_status_url}`);
+              console.log(`📝 Setting "${propName}" to: ${order.order_status_url}`);
             }
             break;
             
-          case 'checkbox':
-            if (propNameLower.includes('value') || propNameLower.includes('high')) {
-              const totalPrice = parseFloat(order.total_price || '0');
-              const isHighValue = totalPrice > 100; // You can adjust this threshold
+          case 'High Value':
+            // Set high value checkbox based on price
+            if (order.total_price) {
+              const totalPrice = parseFloat(order.total_price);
+              const isHighValue = totalPrice >= 500; // Adjust threshold as needed
               properties[propName] = {
                 checkbox: isHighValue,
               };
-              console.log(`📝 Setting checkbox "${propName}" to: ${isHighValue} (price: ${totalPrice})`);
+              console.log(`📝 Setting "${propName}" to: ${isHighValue}`);
+            }
+            break;
+            
+          case 'Days Since Order':
+            // Calculate days since order
+            if (order.created_at) {
+              const orderDate = new Date(order.created_at);
+              const now = new Date();
+              const daysDiff = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+              properties[propName] = {
+                number: daysDiff,
+              };
+              console.log(`📝 Setting "${propName}" to: ${daysDiff}`);
             }
             break;
         }
