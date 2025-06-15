@@ -29,6 +29,24 @@ async function duplicateDatabase(templateDbId: string, userShopName: string): Pr
       database_id: templateDbId,
     });
 
+    // Clean the properties to remove read-only fields
+    const cleanProperties = JSON.parse(JSON.stringify(templateDb.properties));
+    
+    // Remove read-only fields that can't be set during creation
+    Object.keys(cleanProperties).forEach(key => {
+      const prop = cleanProperties[key];
+      if (prop.type === 'status') {
+        // Remove options and groups for status properties - Notion will create defaults
+        delete prop.status.options;
+        delete prop.status.groups;
+      }
+      if (prop.type === 'select' || prop.type === 'multi_select') {
+        // Remove options for select properties - they'll be empty initially
+        delete prop.select?.options;
+        delete prop.multi_select?.options;
+      }
+    });
+
     // Create a new database with the same structure
     const newDb = await notion.databases.create({
       parent: {
@@ -42,7 +60,7 @@ async function duplicateDatabase(templateDbId: string, userShopName: string): Pr
           },
         },
       ],
-      properties: templateDb.properties as any, // Type assertion to handle complex Notion property types
+      properties: cleanProperties as any, // Type assertion to handle complex Notion property types
     });
 
     console.log(`✅ Created new database for ${userShopName}: ${newDb.id}`);
@@ -337,6 +355,24 @@ router.post('/create-db-with-token', async (req, res) => {
       console.log(`📄 Created parent page: ${parentPageId}`);
     }
 
+    // Clean the properties to remove read-only fields
+    const cleanProperties = JSON.parse(JSON.stringify(templateDb.properties));
+    
+    // Remove read-only fields that can't be set during creation
+    Object.keys(cleanProperties).forEach(key => {
+      const prop = cleanProperties[key];
+      if (prop.type === 'status') {
+        // Remove options and groups for status properties - Notion will create defaults
+        delete prop.status.options;
+        delete prop.status.groups;
+      }
+      if (prop.type === 'select' || prop.type === 'multi_select') {
+        // Remove options for select properties - they'll be empty initially
+        delete prop.select?.options;
+        delete prop.multi_select?.options;
+      }
+    });
+
     // Create a new database in user's workspace
     const newDb = await userNotion.databases.create({
       parent: {
@@ -350,7 +386,7 @@ router.post('/create-db-with-token', async (req, res) => {
           },
         },
       ],
-      properties: templateDb.properties as any,
+      properties: cleanProperties as any,
     });
 
     console.log(`✅ Created new database for ${shopName}: ${newDb.id}`);
