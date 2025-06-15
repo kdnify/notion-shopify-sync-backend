@@ -1023,4 +1023,129 @@ router.get('/debug-notion-schema', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/test-order
+ * Test endpoint to create a sample order in the user's new database
+ */
+router.post('/test-order', async (req: Request, res: Response) => {
+  try {
+    console.log('🧪 Creating test order...');
+    
+    const { shop } = req.body;
+    const shopName = shop ? shop.replace('.myshopify.com', '') : 'testcrump1';
+    
+    console.log(`🏪 Creating test order for shop: ${shopName}`);
+
+    // Find all users who have this store connected
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      return res.status(404).json({
+        error: 'No users found with this store connected',
+        shop: shopName
+      });
+    }
+
+    // Create a test order
+    const testOrder = {
+      id: Math.floor(Math.random() * 1000000),
+      order_number: Math.floor(Math.random() * 10000),
+      name: `#TEST${Math.floor(Math.random() * 1000)}`,
+      email: 'test@example.com',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      cancelled_at: null,
+      closed_at: null,
+      processed_at: new Date().toISOString(),
+      customer: {
+        first_name: 'Test',
+        last_name: 'Customer',
+        email: 'test@example.com'
+      },
+      billing_address: null,
+      shipping_address: {
+        address1: '123 Test Street',
+        city: 'Test City',
+        province: 'Test Province',
+        country: 'Test Country',
+        zip: '12345'
+      },
+      currency: 'USD',
+      total_price: '99.99',
+      subtotal_price: '89.99',
+      total_tax: '10.00',
+      line_items: [{
+        title: 'Test Product',
+        quantity: 1,
+        price: '89.99'
+      }],
+      fulfillment_status: 'fulfilled',
+      financial_status: 'paid',
+      tags: 'test-order',
+      note: 'This is a test order created to verify the new database connection',
+      gateway: 'shopify',
+      test: true,
+      order_status_url: `https://${shopName}.myshopify.com/admin/orders/${Math.floor(Math.random() * 1000000)}`
+    };
+
+    // Sync to all users' Notion databases
+    const syncResults = [];
+    for (const { user, store } of usersWithStore) {
+      try {
+        console.log(`📊 Syncing test order to user ${user.email} (${user.id})`);
+        console.log(`📊 User's Notion DB: ${user.notionDbId}`);
+        
+        // Create Notion service for this user
+        const userNotionService = new NotionService(user.notionToken, user.notionDbId);
+        
+        // Create the page in user's Notion database
+        const notionPageId = await userNotionService.createOrderPage(testOrder as any);
+        
+        syncResults.push({
+          userId: user.id,
+          userEmail: user.email,
+          notionDbId: user.notionDbId,
+          notionPageId: notionPageId,
+          success: true
+        });
+        
+        console.log(`✅ Test order synced to ${user.email}'s Notion database: ${notionPageId}`);
+        
+      } catch (userError) {
+        console.error(`❌ Failed to sync test order to user ${user.email}:`, userError);
+        syncResults.push({
+          userId: user.id,
+          userEmail: user.email,
+          notionDbId: user.notionDbId,
+          success: false,
+          error: userError instanceof Error ? userError.message : String(userError)
+        });
+      }
+    }
+
+    const successfulSyncs = syncResults.filter(r => r.success).length;
+    console.log(`🎉 Successfully synced test order to ${successfulSyncs}/${syncResults.length} users`);
+
+    res.status(200).json({
+      success: successfulSyncs > 0,
+      message: `Test order created and synced to ${successfulSyncs}/${syncResults.length} users`,
+      testOrder: {
+        id: testOrder.id,
+        name: testOrder.name,
+        total_price: testOrder.total_price
+      },
+      syncResults: syncResults
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating test order:', error);
+    
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create test order',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 
