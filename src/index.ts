@@ -367,6 +367,12 @@ app.get('/', (req: express.Request, res: express.Response) => {
           <li><a href="/auth?shop=testcrump1">🔗 OAuth Installation (testcrump1)</a></li>
           <li><a href="/app?shop=testcrump1.myshopify.com">📱 Embedded App Preview</a></li>
         </ul>
+        <h3>🧪 Test New User Flow:</h3>
+        <ul>
+          <li><a href="/auth?shop=newstore">🆕 Install App (newstore)</a></li>
+          <li><a href="/auth?shop=demostore">🆕 Install App (demostore)</a></li>
+          <li><a href="/auth?shop=teststore">🆕 Install App (teststore)</a></li>
+        </ul>
         <h3>📋 Integration Status:</h3>
         <p>✅ Server Running<br/>
         ✅ Notion Integration Ready<br/>
@@ -377,6 +383,14 @@ app.get('/', (req: express.Request, res: express.Response) => {
         <h3>🛠 For Shopify Integration:</h3>
         <p>Set your app's <strong>App URL</strong> to: <code>https://your-domain.com/app</code></p>
         <p>Set your <strong>Allowed redirection URL(s)</strong> to: <code>https://your-domain.com/auth/callback</code></p>
+        
+        <h3>📝 How to Test:</h3>
+        <ol>
+          <li>Click one of the "Install App" links above</li>
+          <li>This will simulate a new store installing the app</li>
+          <li>After installation, you'll be redirected to the embedded app</li>
+          <li>Click "Connect to Notion" to test the OAuth flow</li>
+        </ol>
       </body>
     </html>
   `);
