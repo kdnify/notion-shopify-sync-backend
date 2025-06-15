@@ -341,14 +341,14 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
         function openUserDatabase() {
           if (currentNotionDbId) {
-            // Construct proper Notion database URL
-            const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
-            console.log('Opening Notion database:', notionUrl);
+            // Use our redirect endpoint to avoid iframe CSP issues
+            const redirectUrl = '/redirect/notion/' + currentNotionDbId;
+            console.log('Redirecting to:', redirectUrl);
             
-            // Use Shopify App Bridge to redirect to external URL
+            // Use Shopify App Bridge to redirect to our endpoint
             const redirect = Redirect.create(app);
             redirect.dispatch(Redirect.Action.REMOTE, {
-              url: notionUrl,
+              url: redirectUrl,
               newContext: true
             });
           } else {
@@ -764,6 +764,29 @@ app.use('*', (req: express.Request, res: express.Response) => {
     error: 'Not Found',
     message: `Route ${req.originalUrl} not found`
   });
+});
+
+// Redirect to Notion database
+app.get('/redirect/notion/:dbId', (req: express.Request, res: express.Response) => {
+  const { dbId } = req.params;
+  const notionUrl = `https://www.notion.so/${dbId.replace(/-/g, '')}`;
+  
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Opening Notion...</title>
+      <meta http-equiv="refresh" content="0; url=${notionUrl}">
+    </head>
+    <body>
+      <p>Opening your Notion database...</p>
+      <p>If you're not redirected automatically, <a href="${notionUrl}" target="_blank">click here</a>.</p>
+      <script>
+        window.location.href = '${notionUrl}';
+      </script>
+    </body>
+    </html>
+  `);
 });
 
 // Start server

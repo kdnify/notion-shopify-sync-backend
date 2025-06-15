@@ -172,15 +172,9 @@ router.get('/app', async (req: Request, res: Response) => {
 
         function openUserDatabase() {
           if (currentNotionDbId) {
-            const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
-            
-            // Try to open in parent window (outside iframe)
-            if (window.top && window.top !== window) {
-              window.top.open(notionUrl, '_blank', 'noopener,noreferrer');
-            } else {
-              // Fallback to regular window.open
-              window.open(notionUrl, '_blank', 'noopener,noreferrer');
-            }
+            // Use our redirect endpoint to avoid iframe CSP issues
+            const redirectUrl = '/redirect/notion/' + currentNotionDbId;
+            window.location.href = redirectUrl;
           } else {
             alert('No personal database found. Please set up Notion integration.');
           }
