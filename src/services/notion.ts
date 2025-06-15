@@ -200,11 +200,53 @@ export class NotionService {
           case 'status':
             if (propNameLower.includes('status')) {
               // Handle Notion's status field type (different from select)
-              let statusValue = 'unfulfilled'; // Default to unfulfilled
+              // Map from your n8n workflow's capitalized values to Notion status values
+              let statusValue = 'Unfulfilled'; // Default to Unfulfilled (capitalized for Notion)
+              
               if (order.fulfillment_status) {
-                statusValue = order.fulfillment_status.toLowerCase();
+                const fulfillmentStatus = order.fulfillment_status.toLowerCase();
+                // Map common fulfillment statuses to proper Notion status values
+                switch (fulfillmentStatus) {
+                  case 'fulfilled':
+                    statusValue = 'Fulfilled';
+                    break;
+                  case 'partially_fulfilled':
+                  case 'partially fulfilled':
+                    statusValue = 'Partially Fulfilled';
+                    break;
+                  case 'in_progress':
+                  case 'in progress':
+                    statusValue = 'In Progress';
+                    break;
+                  case 'on_hold':
+                  case 'on hold':
+                    statusValue = 'On Hold';
+                    break;
+                  case 'scheduled':
+                    statusValue = 'Scheduled';
+                    break;
+                  case 'restocked':
+                    statusValue = 'Restocked';
+                    break;
+                  case 'unfulfilled':
+                  case 'open':
+                  default:
+                    statusValue = 'Unfulfilled';
+                    break;
+                }
               } else if (order.financial_status) {
-                statusValue = order.financial_status.toLowerCase();
+                // Fallback to financial status if no fulfillment status
+                const financialStatus = order.financial_status.toLowerCase();
+                switch (financialStatus) {
+                  case 'paid':
+                    statusValue = 'Fulfilled';
+                    break;
+                  case 'pending':
+                  case 'authorized':
+                  default:
+                    statusValue = 'Unfulfilled';
+                    break;
+                }
               }
               
               properties[propName] = {

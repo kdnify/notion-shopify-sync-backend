@@ -508,85 +508,108 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
     const results = [];
     
     for (const order of orders) {
+      // Extract shop domain for multi-shop support (outside try block for scope)
+      let cleanShopDomain = 'testcrump1.myshopify.com'; // Default to your test shop
+      
       try {
         console.log(`📝 Processing order: ${order.orderNumber || 'unknown'}`);
         console.log(`📋 Order data:`, JSON.stringify(order, null, 2));
         
-        // Extract shop domain from order data
+        // Extract shop domain from order data (your n8n workflow sends this as shopDomain)
         let shopDomain = order.shopDomain || order.shop || order.storeName;
         if (!shopDomain) {
           console.warn('⚠️ No shop domain found in order data, using default configuration');
+          console.log('🔍 Available order fields:', Object.keys(order));
         }
+        
+        console.log(`🏪 Shop domain extracted: ${shopDomain || 'none'}`);
+        
+        // Set the clean shop domain
+        cleanShopDomain = shopDomain || 'testcrump1.myshopify.com';
+        console.log(`🏪 Processing order for shop: ${cleanShopDomain}`);
 
         // Convert n8n format to Shopify format for Notion service
+        // Your n8n workflow sends excellent data - just need to map it properly
         const shopifyFormatOrder = {
           id: parseInt(order.orderId) || parseInt(order.rawOrderId) || 0,
           order_number: order.orderNumber || 0,
-          name: order.orderName || '#' + order.orderNumber,
+          name: order.orderName || '#' + (order.orderNumber || 'Unknown'),
           email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined,
           created_at: order.createdAt,
-          updated_at: order.updatedAt,
+          updated_at: order.updatedAt || order.createdAt,
           cancelled_at: null,
           closed_at: null,
           processed_at: order.createdAt,
           customer: {
-            first_name: order.hasCustomer ? order.customerName.split(' ')[0] : 'Manual Order',
-            last_name: order.hasCustomer ? order.customerName.split(' ').slice(1).join(' ') : 'No Customer',
-            email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined
+            id: parseInt(order.orderId) || 0,
+            first_name: order.customerName && order.customerName !== 'Manual Order - No Customer' 
+              ? order.customerName.split(' ')[0] 
+              : 'Manual Order',
+            last_name: order.customerName && order.customerName !== 'Manual Order - No Customer'
+              ? order.customerName.split(' ').slice(1).join(' ') || 'Customer'
+              : 'No Customer',
+            email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined,
+            phone: order.customerPhone !== 'No Phone' ? order.customerPhone : null
           },
           billing_address: null,
-          shipping_address: order.shippingAddress !== 'No Address' ? { 
-            address1: order.shippingAddress 
+          shipping_address: order.shippingAddress && order.shippingAddress !== 'No Address' ? { 
+            first_name: order.customerName ? order.customerName.split(' ')[0] : '',
+            last_name: order.customerName ? order.customerName.split(' ').slice(1).join(' ') : '',
+            address1: order.shippingAddress,
+            address2: null,
+            city: '',
+            province: '',
+            country: '',
+            zip: '',
+            phone: order.customerPhone !== 'No Phone' ? order.customerPhone : null
           } : null,
-          currency: order.currency || 'USD',
+          currency: order.currency || 'GBP',
           total_price: (order.totalPrice || 0).toString(),
           subtotal_price: (order.subtotalPrice || 0).toString(),
           total_tax: (order.totalTax || 0).toString(),
           line_items: [{
-            title: order.lineItems || 'Order Item',
+            id: parseInt(order.orderId) || 0,
+            title: order.lineItems || 'Order Items',
             quantity: 1,
-            price: (order.totalPrice || 0).toString()
+            price: (order.totalPrice || 0).toString(),
+            variant_title: null,
+            product_id: 0,
+            variant_id: 0
           }],
+          // Convert capitalized status to lowercase for Notion
           fulfillment_status: order.orderStatus ? order.orderStatus.toLowerCase() : 'unfulfilled',
-          financial_status: order.paymentStatus || 'pending',
+          financial_status: order.paymentStatus ? order.paymentStatus.toLowerCase() : 'pending',
           tags: order.tags || '',
           note: order.note || '',
           gateway: 'shopify',
           test: order.isTest || false,
-          order_status_url: order.shopifyAdminLink || ''
+          order_status_url: order.shopifyAdminLink || '',
+          // Additional fields from your n8n workflow
+          confirmation_number: order.confirmationNumber || '',
+          source_name: order.orderSource || 'web'
         };
 
         let notionPageId: string;
         let targetDatabase = 'default';
 
         // Try to find shop-specific configuration
-        if (shopDomain) {
-          const shopConfig = shopNotionStore.getConfig(shopDomain);
-          if (shopConfig) {
-            console.log(`🎯 Found shop-specific config for: ${shopDomain}`);
-            console.log(`📊 Using database: ${shopConfig.notionDbId}`);
-            
-            // Use shop-specific Notion service
-            const shopNotionService = new NotionService(shopConfig.notionToken, shopConfig.notionDbId);
-            notionPageId = await shopNotionService.createOrderPage(shopifyFormatOrder as any);
-            targetDatabase = shopConfig.notionDbId;
-            
-            console.log(`✅ Synced order #${order.orderNumber} to shop-specific database`);
-          } else {
-            console.log(`⚠️ No shop-specific config found for: ${shopDomain}, using default`);
-            
-            // Fall back to default Notion service
-            if (!notionService) {
-              throw new Error('No default Notion service available and no shop-specific config found');
-            }
-            
-            notionPageId = await notionService.createOrderPage(shopifyFormatOrder as any);
-            console.log(`✅ Synced order #${order.orderNumber} to default database`);
-          }
+        const shopConfig = shopNotionStore.getConfig(cleanShopDomain);
+        if (shopConfig) {
+          console.log(`🎯 Found shop-specific config for: ${cleanShopDomain}`);
+          console.log(`📊 Using database: ${shopConfig.notionDbId}`);
+          
+          // Use shop-specific Notion service
+          const shopNotionService = new NotionService(shopConfig.notionToken, shopConfig.notionDbId);
+          notionPageId = await shopNotionService.createOrderPage(shopifyFormatOrder as any);
+          targetDatabase = shopConfig.notionDbId;
+          
+          console.log(`✅ Synced order #${order.orderNumber} to shop-specific database`);
         } else {
-          // No shop domain provided, use default
+          console.log(`⚠️ No shop-specific config found for: ${cleanShopDomain}, using default`);
+          
+          // Fall back to default Notion service
           if (!notionService) {
-            throw new Error('No default Notion service available and no shop domain provided');
+            throw new Error('No default Notion service available and no shop-specific config found');
           }
           
           notionPageId = await notionService.createOrderPage(shopifyFormatOrder as any);
@@ -596,11 +619,11 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
         results.push({
           orderId: order.orderId || order.rawOrderId,
           orderNumber: order.orderNumber,
-          shopDomain: shopDomain || 'unknown',
+          shopDomain: cleanShopDomain,
           success: true,
           notionPageId: notionPageId,
           targetDatabase: targetDatabase,
-          message: shopDomain && shopNotionStore.hasConfig(shopDomain) 
+          message: shopNotionStore.hasConfig(cleanShopDomain) 
             ? 'Successfully synced to shop-specific database'
             : 'Successfully synced to default database'
         });
@@ -610,7 +633,7 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
         results.push({
           orderId: order.orderId || order.rawOrderId || 'unknown',
           orderNumber: order.orderNumber || 'unknown',
-          shopDomain: order.shopDomain || order.shop || 'unknown',
+          shopDomain: cleanShopDomain || 'unknown',
           success: false,
           error: orderError instanceof Error ? orderError.message : String(orderError)
         });
