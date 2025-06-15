@@ -172,8 +172,6 @@ router.get('/callback', async (req: Request, res: Response) => {
   }
 });
 
-
-
 /**
  * GET /auth/dashboard
  * Get user dashboard with all connected stores
@@ -291,6 +289,68 @@ router.get('/stats', (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to get stats'
+    });
+  }
+});
+
+/**
+ * GET /auth/webhooks-debug
+ * Debug endpoint to list existing webhooks for a shop
+ */
+router.get('/webhooks-debug', async (req: Request, res: Response) => {
+  try {
+    const { shop } = req.query;
+    
+    if (!shop || typeof shop !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Missing shop parameter'
+      });
+    }
+
+    if (!shopifyService) {
+      return res.status(500).json({
+        error: 'Service Configuration Error',
+        message: 'Shopify service not properly configured'
+      });
+    }
+
+    const shopName = shop.replace('.myshopify.com', '');
+    
+    // Get user and store info to get access token
+    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: `No users found with store ${shopName} connected`
+      });
+    }
+
+    const { store } = usersWithStore[0]; // Use first user's store
+    
+    // List existing webhooks
+    const webhooks = await shopifyService.listWebhooks(shopName, store.accessToken);
+    
+    res.json({
+      success: true,
+      shop: shopName,
+      webhookCount: webhooks.length,
+      webhooks: webhooks.map(webhook => ({
+        id: webhook.id,
+        topic: webhook.topic,
+        address: webhook.address,
+        created_at: webhook.created_at,
+        updated_at: webhook.updated_at
+      }))
+    });
+
+  } catch (error) {
+    console.error('❌ Error listing webhooks:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to list webhooks',
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 });

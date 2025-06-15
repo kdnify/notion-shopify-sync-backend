@@ -91,7 +91,7 @@ export class ShopifyService {
 
       const webhookData = {
         webhook: {
-          topic: 'orders/create',
+          topic: 'orders/paid',
           address: webhookUrl,
           format: 'json',
         },
