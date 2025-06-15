@@ -326,8 +326,8 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           }
 
           // Build Notion OAuth URL
-          const clientId = '${process.env.NOTION_OAUTH_CLIENT_ID || '212d872b-594c-80fd-ae95-0037202a219e'}';
-          const redirectUri = encodeURIComponent('https://${req.get('host')}/auth/notion-callback');
+          const clientId = '212d872b-594c-80fd-ae95-0037202a219e';
+          const redirectUri = encodeURIComponent('https://notion-shopify-sync-backend.onrender.com/auth/notion-callback');
           const state = encodeURIComponent(JSON.stringify({
             shop: '${shop}',
             source: 'embedded_app'
