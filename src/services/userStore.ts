@@ -173,6 +173,18 @@ class UserStoreService {
   }
 
   /**
+   * Update Notion Database ID for a user
+   */
+  updateUserNotionDb(userId: string, notionDbId: string): boolean {
+    const user = this.users.get(userId);
+    if (!user) return false;
+
+    user.notionDbId = notionDbId;
+    console.log(`📊 Updated Notion DB ID for user ${userId}: ${notionDbId}`);
+    return true;
+  }
+
+  /**
    * Get stats
    */
   getStats() {

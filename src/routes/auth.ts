@@ -355,4 +355,72 @@ router.get('/webhooks-debug', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /auth/update-notion-db
+ * Update Notion Database ID for a specific shop
+ */
+router.post('/update-notion-db', (req: Request, res: Response) => {
+  try {
+    const { shop, notionDbId } = req.body;
+    
+    if (!shop || !notionDbId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Missing shop or notionDbId parameter'
+      });
+    }
+
+    // Clean shop name
+    const shopName = shop.replace('.myshopify.com', '');
+    
+    // Validate Database ID format
+    const cleanDbId = notionDbId.replace(/-/g, '');
+    if (cleanDbId.length < 32 || !/^[a-f0-9]+$/i.test(cleanDbId)) {
+      return res.status(400).json({
+        error: 'Invalid Database ID',
+        message: 'Notion Database ID format is invalid'
+      });
+    }
+
+    // Find users with this store
+    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      return res.status(404).json({
+        error: 'Store Not Found',
+        message: `No users found with store ${shopName} connected`
+      });
+    }
+
+    // Update the Notion DB ID for all users with this store
+    let updatedCount = 0;
+    for (const { user } of usersWithStore) {
+      const success = userStoreService.updateUserNotionDb(user.id, notionDbId);
+      if (success) {
+        updatedCount++;
+      }
+    }
+
+    console.log(`📊 Updated Notion DB ID for ${updatedCount} users with store ${shopName}`);
+    console.log(`🔗 New Notion DB ID: ${notionDbId}`);
+
+    res.json({
+      success: true,
+      message: `Notion database updated for ${updatedCount} user(s)`,
+      data: {
+        shopName: shopName,
+        notionDbId: notionDbId,
+        updatedUsers: updatedCount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating Notion DB:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update Notion database'
+    });
+  }
+});
+
 export default router; 

@@ -199,6 +199,41 @@ app.get('/app', (req: express.Request, res: express.Response) => {
         </div>
 
         <div class="settings-section">
+          <h2 class="section-title">🛠 Set Up Your Notion Dashboard</h2>
+          <p style="color: #6d7175; margin-bottom: 16px;">Create your own Notion database to track orders from your store.</p>
+          
+          <div style="margin-bottom: 20px;">
+            <button class="sync-button" onclick="openNotionTemplate()" style="background: #0066cc;">
+              📋 Copy the Notion Order Tracker
+            </button>
+            <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">Opens our Notion template in a new tab. Duplicate it to your workspace.</p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #202223;">
+              🔗 Your New Notion Database ID
+            </label>
+            <input 
+              type="text" 
+              id="notionDbId" 
+              placeholder="Paste the ID from your duplicated Notion database URL"
+              style="width: 100%; padding: 12px; border: 1px solid #e1e3e5; border-radius: 6px; font-size: 14px;"
+            />
+            <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
+              💡 Tip: The Database ID is the long string in your Notion database URL after the last slash
+            </p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <button class="sync-button" onclick="updateNotionDb()" id="updateBtn">
+              ✅ Update My Notion Sync
+            </button>
+          </div>
+
+          <div id="setupStatus" style="display: none; padding: 12px; border-radius: 6px; margin-top: 16px;"></div>
+        </div>
+
+        <div class="settings-section">
           <h2 class="section-title">Integration Details</h2>
           <div class="info-row">
             <span class="info-label">Shop Domain:</span>
@@ -277,6 +312,90 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             duration: 2000
           });
           toast.dispatch(Toast.Action.SHOW);
+        }
+
+        function openNotionTemplate() {
+          window.open('https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5', '_blank');
+          
+          const toast = Toast.create(app, {
+            message: '📋 Notion template opened in new tab',
+            duration: 3000
+          });
+          toast.dispatch(Toast.Action.SHOW);
+        }
+
+        async function updateNotionDb() {
+          const notionDbId = document.getElementById('notionDbId').value.trim();
+          const updateBtn = document.getElementById('updateBtn');
+          const statusDiv = document.getElementById('setupStatus');
+          
+          if (!notionDbId) {
+            showStatus('Please enter a Notion Database ID', 'error');
+            return;
+          }
+
+          // Validate Database ID format (basic check)
+          if (notionDbId.length < 32 || !/^[a-f0-9]+$/i.test(notionDbId.replace(/-/g, ''))) {
+            showStatus('Invalid Database ID format. Please check and try again.', 'error');
+            return;
+          }
+
+          updateBtn.disabled = true;
+          updateBtn.textContent = '⏳ Updating...';
+          
+          try {
+            const response = await fetch('/auth/update-notion-db', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                shop: '${shop}',
+                notionDbId: notionDbId
+              })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+              showStatus('✅ Notion database updated successfully! Future orders will sync to your database.', 'success');
+              document.getElementById('notionDbId').value = '';
+              
+              const toast = Toast.create(app, {
+                message: '✅ Notion sync updated successfully',
+                duration: 3000
+              });
+              toast.dispatch(Toast.Action.SHOW);
+            } else {
+              showStatus('❌ Error: ' + (result.message || 'Failed to update database'), 'error');
+            }
+          } catch (error) {
+            showStatus('❌ Network error. Please try again.', 'error');
+          } finally {
+            updateBtn.disabled = false;
+            updateBtn.textContent = '✅ Update My Notion Sync';
+          }
+        }
+
+        function showStatus(message, type) {
+          const statusDiv = document.getElementById('setupStatus');
+          statusDiv.style.display = 'block';
+          statusDiv.textContent = message;
+          
+          if (type === 'success') {
+            statusDiv.style.background = '#f0fff4';
+            statusDiv.style.border = '1px solid #b3ffcc';
+            statusDiv.style.color = '#00cc44';
+          } else {
+            statusDiv.style.background = '#fff2f2';
+            statusDiv.style.border = '1px solid #ffb3b3';
+            statusDiv.style.color = '#cc0000';
+          }
+          
+          // Hide after 5 seconds
+          setTimeout(() => {
+            statusDiv.style.display = 'none';
+          }, 5000);
         }
 
         // Initialize status on load
