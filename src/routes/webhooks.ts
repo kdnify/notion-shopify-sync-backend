@@ -866,4 +866,63 @@ router.get('/inspect-db', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/debug-n8n
+ * Debug endpoint to see exactly what fields n8n is sending
+ */
+router.post('/debug-n8n', async (req: Request, res: Response) => {
+  try {
+    console.log('🔍 Debug n8n endpoint called');
+    console.log('📋 Raw request body:', JSON.stringify(req.body, null, 2));
+
+    const orderData = req.body;
+    const orders = Array.isArray(orderData) ? orderData : [orderData];
+
+    const analysis = orders.map((order, index) => {
+      return {
+        orderIndex: index,
+        receivedFields: Object.keys(order),
+        fieldValues: Object.entries(order).reduce((acc, [key, value]) => {
+          acc[key] = {
+            value: value,
+            type: typeof value,
+            isEmpty: value === null || value === undefined || value === ''
+          };
+          return acc;
+        }, {} as any),
+        mappingAnalysis: {
+          orderId: order.orderId || order.rawOrderId || order.id,
+          orderNumber: order.orderNumber || order.order_number,
+          orderName: order.orderName || order.name,
+          shopDomain: order.shopDomain || order.shop || order.storeName,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          totalPrice: order.totalPrice,
+          orderStatus: order.orderStatus,
+          paymentStatus: order.paymentStatus,
+          createdAt: order.createdAt,
+          shopifyAdminLink: order.shopifyAdminLink
+        }
+      };
+    });
+
+    res.json({
+      success: true,
+      message: 'Debug analysis completed',
+      data: {
+        totalOrders: orders.length,
+        analysis: analysis
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in debug-n8n endpoint:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to analyze n8n data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
