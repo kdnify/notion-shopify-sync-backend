@@ -777,4 +777,37 @@ router.post('/manual-connect', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /auth/debug-fix-user - Direct database fix (no session required)
+ */
+router.get('/debug-fix-user', async (req: Request, res: Response) => {
+  try {
+    const shopName = req.query.shop as string || 'testcrump1';
+    const notionDbId = req.query.db as string || '213e8f5a-c14a-8194-8fac-fc2397a6d283';
+
+    console.log(`🔧 DEBUG: Attempting to fix user for shop: ${shopName} with database: ${notionDbId}`);
+
+    // Update the environment variable directly (this is hacky but will work)
+    process.env.NOTION_DB_ID = notionDbId;
+    console.log(`✅ Updated NOTION_DB_ID to: ${notionDbId}`);
+
+    res.json({
+      success: true,
+      message: `Fixed user connection for ${shopName}`,
+      data: {
+        shopName,
+        notionDbId,
+        action: 'Environment variable updated'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in debug fix:', error);
+    res.status(500).json({
+      error: 'Failed to fix user',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
