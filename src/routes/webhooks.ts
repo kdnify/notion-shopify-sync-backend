@@ -315,11 +315,15 @@ router.post('/sync-to-notion', async (req: Request, res: Response) => {
 router.post('/n8n-orders', async (req: Request, res: Response) => {
   try {
     console.log('📦 Received n8n processed order data');
+    console.log('📋 Raw request body:', JSON.stringify(req.body, null, 2));
 
     const orderData = req.body;
     
     // Handle both single order and array format
     const orders = Array.isArray(orderData) ? orderData : [orderData];
+    
+    console.log('📊 Processing orders:', orders.length);
+    console.log('📋 First order data:', JSON.stringify(orders[0], null, 2));
     
     if (orders.length === 0) {
       return res.status(400).json({
