@@ -1148,4 +1148,134 @@ router.post('/test-order', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/test-user-db
+ * Test endpoint to create an order in a specific user's database
+ */
+router.post('/test-user-db', async (req: Request, res: Response) => {
+  try {
+    const { userId, notionDbId } = req.body;
+    
+    if (!userId || !notionDbId) {
+      return res.status(400).json({
+        error: 'Missing required fields: userId and notionDbId'
+      });
+    }
+
+    console.log(`🧪 Testing database access for user ${userId} with database ${notionDbId}`);
+
+    // Get user info
+    const user = await userStoreService.getUser(userId);
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        userId
+      });
+    }
+
+    // Create a test order
+    const testOrder = {
+      id: Math.floor(Math.random() * 1000000),
+      order_number: Math.floor(Math.random() * 10000),
+      name: `#DBTEST${Math.floor(Math.random() * 1000)}`,
+      email: 'dbtest@example.com',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      cancelled_at: null,
+      closed_at: null,
+      processed_at: new Date().toISOString(),
+      customer: {
+        first_name: 'Database',
+        last_name: 'Test',
+        email: 'dbtest@example.com'
+      },
+      billing_address: null,
+      shipping_address: {
+        address1: '123 Database Test Street',
+        city: 'Test City',
+        province: 'Test Province',
+        country: 'Test Country',
+        zip: '12345'
+      },
+      currency: 'USD',
+      total_price: '99.99',
+      subtotal_price: '89.99',
+      total_tax: '10.00',
+      line_items: [{
+        title: 'Database Test Product',
+        quantity: 1,
+        price: '89.99'
+      }],
+      fulfillment_status: 'fulfilled',
+      financial_status: 'paid',
+      tags: 'database-test',
+      note: 'This is a database connectivity test order',
+      gateway: 'shopify',
+      test: true,
+      order_status_url: `https://test.myshopify.com/admin/orders/${Math.floor(Math.random() * 1000000)}`
+    };
+
+    try {
+      console.log(`📊 Testing database access for user ${user.email}`);
+      console.log(`📊 Database ID: ${notionDbId}`);
+      console.log(`📊 User's stored DB ID: ${user.notionDbId}`);
+      
+      // Create Notion service for this specific database
+      const userNotionService = new NotionService(user.notionToken, notionDbId);
+      
+      // Test database access first
+      const canAccess = await userNotionService.testConnection();
+      if (!canAccess) {
+        return res.status(400).json({
+          error: 'Cannot access database',
+          message: 'Database is not shared with the integration or does not exist',
+          userId: user.id,
+          userEmail: user.email,
+          notionDbId: notionDbId
+        });
+      }
+      
+      // Create the page in the specified database
+      const notionPageId = await userNotionService.createOrderPage(testOrder as any);
+      
+      console.log(`✅ Database test successful! Created page: ${notionPageId}`);
+      
+      res.json({
+        success: true,
+        message: 'Database test successful - order created',
+        testOrder: {
+          id: testOrder.id,
+          name: testOrder.name,
+          total_price: testOrder.total_price
+        },
+        result: {
+          userId: user.id,
+          userEmail: user.email,
+          notionDbId: notionDbId,
+          notionPageId: notionPageId,
+          canAccess: true
+        }
+      });
+      
+    } catch (dbError) {
+      console.error(`❌ Database test failed:`, dbError);
+      res.status(500).json({
+        error: 'Database access failed',
+        message: dbError instanceof Error ? dbError.message : String(dbError),
+        userId: user.id,
+        userEmail: user.email,
+        notionDbId: notionDbId
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error in database test:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to test database',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 
