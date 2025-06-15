@@ -128,7 +128,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     try {
       // Try to get existing user first
       user = await userStoreService.getUserByEmail(email);
-      console.log(`✅ Found existing user: ${user.id}`);
+      console.log(`✅ Found existing user: ${user!.id}`);
     } catch {
       // User doesn't exist, create with minimal required info
       console.log(`🆕 Creating new user for ${shopName}`);
@@ -137,7 +137,7 @@ router.get('/callback', async (req: Request, res: Response) => {
         process.env.NOTION_TOKEN || '', // Use system token initially
         '' // No database ID yet - will be set after creation
       );
-      console.log(`✅ Created new user: ${user.id}`);
+      console.log(`✅ Created new user: ${user!.id}`);
     }
 
     if (!user) {
@@ -149,8 +149,8 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // 🆕 ENSURE STORE CONNECTION - Critical for webhook routing
     try {
-      await userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
-      console.log(`🔗 Connected store ${shopName} to user ${user.id}`);
+      await userStoreService.addStoreToUser(validUser.id, shopName, shopInfo.domain, accessToken);
+      console.log(`🔗 Connected store ${shopName} to user ${validUser.id}`);
       
       // Verify the connection was created
       const verification = await userStoreService.getAllUsersWithStore(shopName);
@@ -170,7 +170,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     }
 
     // Create session for user
-    const sessionId = userStoreService.createSession(user.id);
+    const sessionId = userStoreService.createSession(validUser.id);
     console.log(`🎫 Created session: ${sessionId}`);
 
     // 🎯 SEAMLESS REDIRECT TO NOTION OAUTH
