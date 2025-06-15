@@ -326,7 +326,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           }
 
           // Build Notion OAuth URL
-          const clientId = '212d872b-594c-80fd-ae95-0037202a219e';
+          const clientId = '${process.env.NOTION_OAUTH_CLIENT_ID || '212d872b-594c-80fd-ae95-0037202a219e'}';
           const redirectUri = encodeURIComponent('${req.protocol}://${req.get('host')}/auth/notion-callback');
           const state = encodeURIComponent(JSON.stringify({
             shop: '${shop}',

@@ -548,10 +548,19 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
     console.log(`🔑 Processing Notion OAuth for shop: ${shopName}`);
 
     // Exchange code for access token
+    const clientId = process.env.NOTION_OAUTH_CLIENT_ID || '212d872b-594c-80fd-ae95-0037202a219e';
+    const clientSecret = process.env.NOTION_OAUTH_CLIENT_SECRET || '';
+
+    if (!clientSecret) {
+      console.error('❌ Missing NOTION_OAUTH_CLIENT_SECRET');
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      return res.redirect(`${appUrl}/app?shop=${shopDomain}&error=${encodeURIComponent('Notion OAuth not configured')}`);
+    }
+
     const tokenResponse = await fetch('https://api.notion.com/v1/oauth/token', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${Buffer.from('212d872b-594c-80fd-ae95-0037202a219e:secret_OHDs08lzFH2scqrgxCot72sQ3b86hvTg9Ga9HaMYksi').toString('base64')}`,
+        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
         'Content-Type': 'application/json',
         'Notion-Version': '2022-06-28'
       },
