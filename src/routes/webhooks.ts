@@ -516,6 +516,7 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
     for (const order of orders) {
       try {
         console.log(`📝 Processing order: ${order.orderNumber || 'unknown'}`);
+        console.log(`📋 Order data:`, JSON.stringify(order, null, 2));
         
         // Convert n8n format to Shopify format for Notion service
         const shopifyFormatOrder = {

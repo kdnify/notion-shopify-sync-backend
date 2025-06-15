@@ -121,12 +121,14 @@ export class NotionService {
             },
           },
           
-          // Created Date
-          'Created At': {
-            date: {
-              start: order.created_at,
+          // Created Date - handle different date formats
+          ...(order.created_at ? {
+            'Created At': {
+              date: {
+                start: order.created_at,
+              },
             },
-          },
+          } : {}),
           
           // Line Items
           'Line Items': {
