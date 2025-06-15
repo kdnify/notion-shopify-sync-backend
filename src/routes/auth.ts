@@ -170,7 +170,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     }
 
     // Create session for user
-    const sessionId = userStoreService.createSession(validUser.id);
+    const sessionId = await userStoreService.createSession(validUser.id);
     console.log(`🎫 Created session: ${sessionId}`);
 
     // 🎯 SEAMLESS REDIRECT TO NOTION OAUTH
