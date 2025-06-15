@@ -6,6 +6,7 @@ import path from 'path';
 import webhookRoutes from './routes/webhooks';
 import authRoutes from './routes/auth';
 import notionRoutes from './routes/notion';
+import configRoutes from './routes/config';
 
 // Load environment variables
 dotenv.config();
@@ -41,6 +42,7 @@ app.use('/static', express.static(path.join(__dirname, '../public')));
 app.use('/auth', authRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/notion', notionRoutes);
+app.use('/config', configRoutes);
 
 // Embedded app main interface
 app.get('/app', (req: express.Request, res: express.Response) => {

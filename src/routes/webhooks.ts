@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { verifyShopifyWebhook, ShopifyOrder } from '../utils/verifyShopify';
 import { NotionService } from '../services/notion';
 import { userStoreService } from '../services/userStore';
+import { shopNotionStore } from '../services/shopNotionStore';
 
 const router = Router();
 
@@ -485,20 +486,13 @@ router.post('/n8n-orders', async (req: Request, res: Response) => {
 
 /**
  * POST /webhooks/n8n-simple
- * Simple endpoint that sends n8n data directly to the original database
- * No user routing - just straight to the default database
+ * Smart endpoint that routes n8n data to shop-specific Notion databases
+ * Falls back to default database if no shop-specific config found
  */
 router.post('/n8n-simple', async (req: Request, res: Response) => {
   try {
-    console.log('📦 Received n8n order for simple processing');
+    console.log('📦 Received n8n order for smart processing');
     console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
-
-    if (!notionService) {
-      return res.status(500).json({
-        error: 'Notion service not initialized',
-        message: 'Default Notion configuration is missing'
-      });
-    }
 
     const orderData = req.body;
     
@@ -518,6 +512,12 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
         console.log(`📝 Processing order: ${order.orderNumber || 'unknown'}`);
         console.log(`📋 Order data:`, JSON.stringify(order, null, 2));
         
+        // Extract shop domain from order data
+        let shopDomain = order.shopDomain || order.shop || order.storeName;
+        if (!shopDomain) {
+          console.warn('⚠️ No shop domain found in order data, using default configuration');
+        }
+
         // Convert n8n format to Shopify format for Notion service
         const shopifyFormatOrder = {
           id: parseInt(order.orderId) || parseInt(order.rawOrderId) || 0,
@@ -556,24 +556,61 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
           order_status_url: order.shopifyAdminLink || ''
         };
 
-        // Send directly to default Notion database
-        const notionPageId = await notionService.createOrderPage(shopifyFormatOrder as any);
+        let notionPageId: string;
+        let targetDatabase = 'default';
+
+        // Try to find shop-specific configuration
+        if (shopDomain) {
+          const shopConfig = shopNotionStore.getConfig(shopDomain);
+          if (shopConfig) {
+            console.log(`🎯 Found shop-specific config for: ${shopDomain}`);
+            console.log(`📊 Using database: ${shopConfig.notionDbId}`);
+            
+            // Use shop-specific Notion service
+            const shopNotionService = new NotionService(shopConfig.notionToken, shopConfig.notionDbId);
+            notionPageId = await shopNotionService.createOrderPage(shopifyFormatOrder as any);
+            targetDatabase = shopConfig.notionDbId;
+            
+            console.log(`✅ Synced order #${order.orderNumber} to shop-specific database`);
+          } else {
+            console.log(`⚠️ No shop-specific config found for: ${shopDomain}, using default`);
+            
+            // Fall back to default Notion service
+            if (!notionService) {
+              throw new Error('No default Notion service available and no shop-specific config found');
+            }
+            
+            notionPageId = await notionService.createOrderPage(shopifyFormatOrder as any);
+            console.log(`✅ Synced order #${order.orderNumber} to default database`);
+          }
+        } else {
+          // No shop domain provided, use default
+          if (!notionService) {
+            throw new Error('No default Notion service available and no shop domain provided');
+          }
+          
+          notionPageId = await notionService.createOrderPage(shopifyFormatOrder as any);
+          console.log(`✅ Synced order #${order.orderNumber} to default database`);
+        }
         
         results.push({
           orderId: order.orderId || order.rawOrderId,
           orderNumber: order.orderNumber,
+          shopDomain: shopDomain || 'unknown',
           success: true,
           notionPageId: notionPageId,
-          message: 'Successfully synced to default database'
+          targetDatabase: targetDatabase,
+          message: shopDomain && shopNotionStore.hasConfig(shopDomain) 
+            ? 'Successfully synced to shop-specific database'
+            : 'Successfully synced to default database'
         });
-        
-        console.log(`✅ Synced order #${order.orderNumber} to default database`);
         
       } catch (orderError) {
         console.error(`❌ Failed to process order:`, orderError);
         results.push({
           orderId: order.orderId || order.rawOrderId || 'unknown',
           orderNumber: order.orderNumber || 'unknown',
+          shopDomain: order.shopDomain || order.shop || 'unknown',
           success: false,
           error: orderError instanceof Error ? orderError.message : String(orderError)
         });
@@ -581,13 +618,16 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
     }
 
     const successfulSyncs = results.filter(r => r.success).length;
+    const shopSpecificSyncs = results.filter(r => r.success && r.targetDatabase !== 'default').length;
     
     res.json({
       success: successfulSyncs > 0,
-      message: `Successfully processed ${successfulSyncs}/${results.length} orders to default database`,
+      message: `Successfully processed ${successfulSyncs}/${results.length} orders (${shopSpecificSyncs} to shop-specific databases, ${successfulSyncs - shopSpecificSyncs} to default)`,
       data: {
         processedOrders: results.length,
         successfulSyncs: successfulSyncs,
+        shopSpecificSyncs: shopSpecificSyncs,
+        defaultSyncs: successfulSyncs - shopSpecificSyncs,
         results: results
       }
     });
