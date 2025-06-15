@@ -87,7 +87,7 @@ router.get('/app', async (req: Request, res: Response) => {
                 <h3>✅ Personal Notion Database Connected</h3>
                 <p>Your Shopify orders will automatically sync to your personal Notion database.</p>
                 <p id="databaseUrl">Database ID: Loading...</p>
-                <button class="btn" onclick="openUserDatabase()">Open My Dashboard</button>  
+                <button id="openDashboardBtn" class="btn">Open My Dashboard</button>  
             </div>
         </div>
 
@@ -181,7 +181,15 @@ router.get('/app', async (req: Request, res: Response) => {
         }
 
         // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', initializeApp);
+        document.addEventListener('DOMContentLoaded', function() {
+          initializeApp();
+          
+          // Add event listener for dashboard button
+          const openDashboardBtn = document.getElementById('openDashboardBtn');
+          if (openDashboardBtn) {
+            openDashboardBtn.addEventListener('click', openUserDatabase);
+          }
+        });
     </script>
 </body>
 </html>
