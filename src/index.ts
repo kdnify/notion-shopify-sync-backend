@@ -763,14 +763,6 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   });
 });
 
-// 404 handler
-app.use('*', (req: express.Request, res: express.Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.originalUrl} not found`
-  });
-});
-
 // Redirect to Notion database
 app.get('/redirect/notion/:dbId', (req: express.Request, res: express.Response) => {
   const { dbId } = req.params;
@@ -792,6 +784,14 @@ app.get('/redirect/notion/:dbId', (req: express.Request, res: express.Response) 
     </body>
     </html>
   `);
+});
+
+// 404 handler
+app.use('*', (req: express.Request, res: express.Response) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.originalUrl} not found`
+  });
 });
 
 // Start server
