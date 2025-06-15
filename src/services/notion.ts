@@ -38,122 +38,116 @@ export class NotionService {
         .map(item => `${item.title} (x${item.quantity}) - $${item.price}`)
         .join('\n');
 
+      // First, get the database schema to see what properties exist
+      const database = await this.notion.databases.retrieve({
+        database_id: this.databaseId,
+      });
+
+      const properties: any = {};
+      
+      // Find the title property (there should be exactly one)
+      const titleProperty = Object.entries(database.properties as any).find(
+        ([key, prop]: [string, any]) => prop.type === 'title'
+      );
+      
+      if (titleProperty) {
+        properties[titleProperty[0]] = {
+          title: [
+            {
+              text: {
+                content: order.name || `Order #${order.order_number}`,
+              },
+            },
+          ],
+        };
+      }
+
+      // Add other properties if they exist in the database
+      Object.entries(database.properties as any).forEach(([propName, propConfig]: [string, any]) => {
+        if (propConfig.type === 'title') return; // Already handled above
+        
+        // Try to match common property names and types
+        switch (propConfig.type) {
+          case 'rich_text':
+            if (propName.toLowerCase().includes('customer') && order.customer) {
+              properties[propName] = {
+                rich_text: [
+                  {
+                    text: {
+                      content: `${order.customer.first_name} ${order.customer.last_name}`,
+                    },
+                  },
+                ],
+              };
+            } else if (propName.toLowerCase().includes('email') && order.customer?.email) {
+              properties[propName] = {
+                rich_text: [
+                  {
+                    text: {
+                      content: order.customer.email,
+                    },
+                  },
+                ],
+              };
+            } else if (propName.toLowerCase().includes('line') || propName.toLowerCase().includes('item')) {
+              properties[propName] = {
+                rich_text: [
+                  {
+                    text: {
+                      content: lineItemsText,
+                    },
+                  },
+                ],
+              };
+            }
+            break;
+          
+          case 'number':
+            if (propName.toLowerCase().includes('total') || propName.toLowerCase().includes('price')) {
+              properties[propName] = {
+                number: parseFloat(order.total_price) || 0,
+              };
+            } else if (propName.toLowerCase().includes('order') && propName.toLowerCase().includes('number')) {
+              properties[propName] = {
+                number: order.order_number || 0,
+              };
+            }
+            break;
+          
+          case 'date':
+            if (propName.toLowerCase().includes('created') && order.created_at) {
+              properties[propName] = {
+                date: {
+                  start: order.created_at,
+                },
+              };
+            }
+            break;
+          
+          case 'select':
+            if (propName.toLowerCase().includes('currency')) {
+              properties[propName] = {
+                select: {
+                  name: order.currency || 'USD',
+                },
+              };
+            } else if (propName.toLowerCase().includes('status')) {
+              properties[propName] = {
+                select: {
+                  name: order.financial_status || 'pending',
+                },
+              };
+            }
+            break;
+        }
+      });
+
       // Create the page in Notion
       const response = await this.notion.pages.create({
         parent: {
           database_id: this.databaseId,
         },
-        properties: {
-          // Order Title - using order name as the title
-          'Name': {
-            title: [
-              {
-                text: {
-                  content: order.name || `Order #${order.order_number}`,
-                },
-              },
-            ],
-          },
-          
-          // Order Number
-          'Order Number': {
-            number: order.order_number,
-          },
-          
-          // Order ID
-          'Order ID': {
-            rich_text: [
-              {
-                text: {
-                  content: order.id.toString(),
-                },
-              },
-            ],
-          },
-          
-          // Customer Name
-          'Customer': {
-            rich_text: [
-              {
-                text: {
-                  content: `${order.customer.first_name} ${order.customer.last_name}`,
-                },
-              },
-            ],
-          },
-          
-          // Customer Email - handle different property types
-          ...(order.customer.email ? {
-            'Email': {
-              rich_text: [
-                {
-                  text: {
-                    content: order.customer.email,
-                  },
-                },
-              ],
-            },
-          } : {}),
-          
-          // Total Price
-          'Total': {
-            number: parseFloat(order.total_price),
-          },
-          
-          // Currency
-          'Currency': {
-            select: {
-              name: order.currency,
-            },
-          },
-          
-          // Financial Status
-          'Financial Status': {
-            select: {
-              name: order.financial_status,
-            },
-          },
-          
-          // Fulfillment Status
-          'Fulfillment Status': {
-            select: {
-              name: order.fulfillment_status || 'unfulfilled',
-            },
-          },
-          
-          // Created Date - handle different date formats
-          ...(order.created_at ? {
-            'Created At': {
-              date: {
-                start: order.created_at,
-              },
-            },
-          } : {}),
-          
-          // Line Items
-          'Line Items': {
-            rich_text: [
-              {
-                text: {
-                  content: lineItemsText,
-                },
-              },
-            ],
-          },
-          
-          // Shipping Address
-          'Shipping Address': {
-            rich_text: [
-              {
-                text: {
-                  content: order.shipping_address
-                    ? `${order.shipping_address.address1}${order.shipping_address.address2 ? ', ' + order.shipping_address.address2 : ''}, ${order.shipping_address.city}, ${order.shipping_address.province} ${order.shipping_address.zip}, ${order.shipping_address.country}`
-                    : 'No shipping address',
-                },
-              },
-            ],
-          },
-        },
+        properties,
       });
 
       console.log(`✅ Successfully created Notion page for order #${order.order_number}`);
