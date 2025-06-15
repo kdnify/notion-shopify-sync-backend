@@ -492,9 +492,20 @@ router.post('/n8n-orders', async (req: Request, res: Response) => {
 router.post('/n8n-simple', async (req: Request, res: Response) => {
   try {
     console.log('📦 Received n8n order for smart processing');
-    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
-
-    const orderData = req.body;
+    
+    // Handle both Buffer (from raw body parser) and parsed JSON
+    let orderData;
+    if (Buffer.isBuffer(req.body)) {
+      console.log('📋 Parsing Buffer data...');
+      const jsonString = req.body.toString('utf8');
+      console.log('📋 JSON string:', jsonString);
+      orderData = JSON.parse(jsonString);
+    } else {
+      console.log('📋 Using parsed JSON data...');
+      orderData = req.body;
+    }
+    
+    console.log('📋 Processed order data:', JSON.stringify(orderData, null, 2));
     
     // Handle both single order and array format
     const orders = Array.isArray(orderData) ? orderData : [orderData];
@@ -942,14 +953,32 @@ router.post('/debug-n8n-data', async (req: Request, res: Response) => {
     console.log('🔍 DEBUG: Raw request body:', req.body);
     console.log('🔍 DEBUG: Request headers:', req.headers);
     console.log('🔍 DEBUG: Body type:', typeof req.body);
-    console.log('🔍 DEBUG: Body stringified:', JSON.stringify(req.body, null, 2));
+    
+    // Handle both Buffer and parsed JSON
+    let parsedBody;
+    if (Buffer.isBuffer(req.body)) {
+      const jsonString = req.body.toString('utf8');
+      console.log('🔍 DEBUG: JSON string from buffer:', jsonString);
+      try {
+        parsedBody = JSON.parse(jsonString);
+        console.log('🔍 DEBUG: Parsed JSON:', JSON.stringify(parsedBody, null, 2));
+      } catch (parseError) {
+        console.error('🔍 DEBUG: Failed to parse JSON:', parseError);
+        parsedBody = { error: 'Failed to parse JSON', rawString: jsonString };
+      }
+    } else {
+      parsedBody = req.body;
+    }
+    
+    console.log('🔍 DEBUG: Final parsed body:', JSON.stringify(parsedBody, null, 2));
     
     res.json({
       success: true,
       message: 'Debug data received',
       data: {
-        receivedBody: req.body,
+        receivedBody: parsedBody,
         bodyType: typeof req.body,
+        isBuffer: Buffer.isBuffer(req.body),
         headers: req.headers,
         timestamp: new Date().toISOString()
       }
