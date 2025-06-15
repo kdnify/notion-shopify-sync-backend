@@ -32,6 +32,7 @@ export class NotionService {
   async createOrderPage(order: ShopifyOrder): Promise<string> {
     try {
       console.log(`Creating Notion page for order #${order.order_number}`);
+      console.log('📋 Order data received:', JSON.stringify(order, null, 2));
 
       // Format line items as a readable string
       const lineItemsText = order.line_items
@@ -43,6 +44,8 @@ export class NotionService {
         database_id: this.databaseId,
       });
 
+      console.log('📊 Database properties:', Object.keys(database.properties as any));
+
       const properties: any = {};
       
       // Find the title property (there should be exactly one)
@@ -51,35 +54,44 @@ export class NotionService {
       );
       
       if (titleProperty) {
+        const titleValue = order.name || `Order #${order.order_number}`;
         properties[titleProperty[0]] = {
           title: [
             {
               text: {
-                content: order.name || `Order #${order.order_number}`,
+                content: titleValue,
               },
             },
           ],
         };
+        console.log(`📝 Setting title "${titleProperty[0]}" to: ${titleValue}`);
       }
 
       // Add other properties if they exist in the database
       Object.entries(database.properties as any).forEach(([propName, propConfig]: [string, any]) => {
         if (propConfig.type === 'title') return; // Already handled above
         
+        const propNameLower = propName.toLowerCase();
+        console.log(`🔍 Checking property: ${propName} (type: ${propConfig.type})`);
+        
         // Try to match common property names and types
         switch (propConfig.type) {
           case 'rich_text':
-            if (propName.toLowerCase().includes('customer') && order.customer) {
-              properties[propName] = {
-                rich_text: [
-                  {
-                    text: {
-                      content: `${order.customer.first_name} ${order.customer.last_name}`,
+            if ((propNameLower.includes('customer') || propNameLower.includes('name')) && order.customer) {
+              const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim();
+              if (customerName) {
+                properties[propName] = {
+                  rich_text: [
+                    {
+                      text: {
+                        content: customerName,
+                      },
                     },
-                  },
-                ],
-              };
-            } else if (propName.toLowerCase().includes('email') && order.customer?.email) {
+                  ],
+                };
+                console.log(`📝 Setting customer name "${propName}" to: ${customerName}`);
+              }
+            } else if (propNameLower.includes('email') && order.customer?.email) {
               properties[propName] = {
                 rich_text: [
                   {
@@ -89,7 +101,8 @@ export class NotionService {
                   },
                 ],
               };
-            } else if (propName.toLowerCase().includes('line') || propName.toLowerCase().includes('item')) {
+              console.log(`📝 Setting email "${propName}" to: ${order.customer.email}`);
+            } else if ((propNameLower.includes('line') || propNameLower.includes('item') || propNameLower.includes('product')) && lineItemsText) {
               properties[propName] = {
                 rich_text: [
                   {
@@ -99,48 +112,114 @@ export class NotionService {
                   },
                 ],
               };
+              console.log(`📝 Setting items "${propName}" to: ${lineItemsText}`);
+            } else if ((propNameLower.includes('address') || propNameLower.includes('shipping')) && order.shipping_address?.address1) {
+              properties[propName] = {
+                rich_text: [
+                  {
+                    text: {
+                      content: order.shipping_address.address1,
+                    },
+                  },
+                ],
+              };
+              console.log(`📝 Setting address "${propName}" to: ${order.shipping_address.address1}`);
+            } else if (propNameLower.includes('note') && order.note) {
+              properties[propName] = {
+                rich_text: [
+                  {
+                    text: {
+                      content: order.note,
+                    },
+                  },
+                ],
+              };
+              console.log(`📝 Setting notes "${propName}" to: ${order.note}`);
             }
             break;
           
           case 'number':
-            if (propName.toLowerCase().includes('total') || propName.toLowerCase().includes('price')) {
+            if ((propNameLower.includes('total') || propNameLower.includes('price')) && order.total_price) {
+              const totalPrice = parseFloat(order.total_price);
+              if (!isNaN(totalPrice)) {
+                properties[propName] = {
+                  number: totalPrice,
+                };
+                console.log(`📝 Setting total price "${propName}" to: ${totalPrice}`);
+              }
+            } else if ((propNameLower.includes('order') && propNameLower.includes('id')) && order.id) {
               properties[propName] = {
-                number: parseFloat(order.total_price) || 0,
+                number: parseInt(order.id.toString()) || 0,
               };
-            } else if (propName.toLowerCase().includes('order') && propName.toLowerCase().includes('number')) {
+              console.log(`📝 Setting order ID "${propName}" to: ${order.id}`);
+            } else if ((propNameLower.includes('order') && propNameLower.includes('number')) && order.order_number) {
               properties[propName] = {
                 number: order.order_number || 0,
               };
+              console.log(`📝 Setting order number "${propName}" to: ${order.order_number}`);
             }
             break;
           
           case 'date':
-            if (propName.toLowerCase().includes('created') && order.created_at) {
+            if ((propNameLower.includes('created') || propNameLower.includes('order') && propNameLower.includes('date')) && order.created_at) {
               properties[propName] = {
                 date: {
                   start: order.created_at,
                 },
               };
+              console.log(`📝 Setting date "${propName}" to: ${order.created_at}`);
             }
             break;
           
           case 'select':
-            if (propName.toLowerCase().includes('currency')) {
+            if (propNameLower.includes('currency') && order.currency) {
               properties[propName] = {
                 select: {
                   name: order.currency || 'USD',
                 },
               };
-            } else if (propName.toLowerCase().includes('status')) {
+              console.log(`📝 Setting currency "${propName}" to: ${order.currency}`);
+            } else if (propNameLower.includes('status')) {
+              // Check for fulfillment status first, then financial status
+              let statusValue = 'pending';
+              if (order.fulfillment_status) {
+                statusValue = order.fulfillment_status;
+              } else if (order.financial_status) {
+                statusValue = order.financial_status;
+              }
+              
               properties[propName] = {
                 select: {
-                  name: order.financial_status || 'pending',
+                  name: statusValue,
                 },
               };
+              console.log(`📝 Setting status "${propName}" to: ${statusValue} (fulfillment: ${order.fulfillment_status}, financial: ${order.financial_status})`);
+            }
+            break;
+            
+          case 'url':
+            if ((propNameLower.includes('shopify') || propNameLower.includes('link')) && order.order_status_url) {
+              properties[propName] = {
+                url: order.order_status_url,
+              };
+              console.log(`📝 Setting URL "${propName}" to: ${order.order_status_url}`);
+            }
+            break;
+            
+          case 'checkbox':
+            if (propNameLower.includes('value') || propNameLower.includes('high')) {
+              const totalPrice = parseFloat(order.total_price || '0');
+              const isHighValue = totalPrice > 100; // You can adjust this threshold
+              properties[propName] = {
+                checkbox: isHighValue,
+              };
+              console.log(`📝 Setting checkbox "${propName}" to: ${isHighValue} (price: ${totalPrice})`);
             }
             break;
         }
       });
+
+      console.log(`📊 Final properties to be set:`, Object.keys(properties));
 
       // Create the page in Notion
       const response = await this.notion.pages.create({

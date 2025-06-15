@@ -48,6 +48,8 @@ export interface ShopifyOrder {
   currency: string;
   financial_status: string;
   fulfillment_status: string | null;
+  note?: string;
+  order_status_url?: string;
   customer: {
     id: number;
     first_name: string;
