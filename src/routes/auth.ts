@@ -721,4 +721,60 @@ router.post('/connect-store', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /auth/manual-connect
+ * Manually connect a store to a database (debug endpoint)
+ */
+router.post('/manual-connect', async (req: Request, res: Response) => {
+  try {
+    const { shopName, notionDbId, email } = req.body;
+
+    if (!shopName || !notionDbId) {
+      return res.status(400).json({
+        error: 'Missing required fields: shopName and notionDbId'
+      });
+    }
+
+    // Create or update user
+    let user;
+    try {
+      user = await userStoreService.getUserByEmail(email || `user-${shopName}@shopify.local`);
+    } catch {
+      // User doesn't exist, let's try a different approach
+      console.log(`⚠️ User not found, will create during store connection`);
+      user = null;
+    }
+
+    // Update database ID
+    await userStoreService.updateUserNotionDb(user.id, notionDbId);
+
+    // Add store connection
+    await userStoreService.addStoreToUser(
+      user.id,
+      shopName,
+      `${shopName}.myshopify.com`,
+      process.env.SHOPIFY_ACCESS_TOKEN || ''
+    );
+
+    console.log(`🔗 Manually connected ${shopName} to database ${notionDbId}`);
+
+    res.json({
+      success: true,
+      message: 'Store manually connected successfully',
+      data: {
+        userId: user.id,
+        shopName,
+        notionDbId
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in manual connect:', error);
+    res.status(500).json({
+      error: 'Failed to manually connect store',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
