@@ -20,7 +20,7 @@ try {
  */
 router.get('/', (req: Request, res: Response) => {
   try {
-    const { shop, email, notionToken, notionDbId } = req.query;
+    const { shop, email, notionToken, notionDbId, source } = req.query;
 
     if (!shop || typeof shop !== 'string') {
       return res.status(400).json({
@@ -43,13 +43,14 @@ router.get('/', (req: Request, res: Response) => {
     const state = JSON.stringify({
       email: email || '',
       notionToken: notionToken || process.env.NOTION_TOKEN || '',
-      notionDbId: notionDbId || process.env.NOTION_DB_ID || ''
+      notionDbId: notionDbId || process.env.NOTION_DB_ID || '',
+      source: source || 'direct' // Track if this is from setup flow
     });
     
     // Generate OAuth URL with state
     const authUrl = shopifyService.generateAuthUrl(shopName, state);
     
-    console.log(`🔐 Redirecting ${shopName} to OAuth: ${authUrl}`);
+    console.log(`🔐 Redirecting ${shopName} to OAuth: ${authUrl} (source: ${source || 'direct'})`);
     
     // Redirect to Shopify OAuth
     res.redirect(authUrl);
@@ -185,9 +186,21 @@ router.get('/callback', async (req: Request, res: Response) => {
     // Create session for user
     const sessionId = userStoreService.createSession(user.id);
 
+    // Check if this is from the setup flow
+    const isSetupFlow = req.query.state && typeof req.query.state === 'string' && 
+                       JSON.parse(req.query.state).source === 'setup';
+
     // Redirect to embedded app interface
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-    const redirectUrl = `${appUrl}/app?shop=${shopInfo.domain}&installed=true`;
+    let redirectUrl;
+    
+    if (isSetupFlow) {
+      // For setup flow, redirect to app with setup parameter to auto-trigger Notion connection
+      redirectUrl = `${appUrl}/app?shop=${shopInfo.domain}&installed=true&setup=true`;
+    } else {
+      // Normal installation flow
+      redirectUrl = `${appUrl}/app?shop=${shopInfo.domain}&installed=true`;
+    }
     
     console.log(`🔄 Redirecting to embedded app: ${redirectUrl}`);
     res.redirect(redirectUrl);

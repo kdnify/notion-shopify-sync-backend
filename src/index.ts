@@ -255,14 +255,41 @@ app.get('/app', (req: express.Request, res: express.Response) => {
               } else {
                 console.log('No database found, showing connect option');
                 showDatabaseNotConnected();
+                
+                // Check if this is from setup flow and auto-trigger Notion connection
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('setup') === 'true') {
+                  console.log('Setup flow detected, auto-triggering Notion connection');
+                  setTimeout(() => {
+                    connectToNotion();
+                  }, 1000); // Small delay to let UI render
+                }
               }
             } else {
               console.log('Failed to load user info, showing connect option');
               showDatabaseNotConnected();
+              
+              // Check if this is from setup flow and auto-trigger Notion connection
+              const urlParams = new URLSearchParams(window.location.search);
+              if (urlParams.get('setup') === 'true') {
+                console.log('Setup flow detected, auto-triggering Notion connection');
+                setTimeout(() => {
+                  connectToNotion();
+                }, 1000); // Small delay to let UI render
+              }
             }
           } catch (error) {
             console.log('Could not load user info:', error);
             showDatabaseNotConnected();
+            
+            // Check if this is from setup flow and auto-trigger Notion connection
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('setup') === 'true') {
+              console.log('Setup flow detected, auto-triggering Notion connection');
+              setTimeout(() => {
+                connectToNotion();
+              }, 1000); // Small delay to let UI render
+            }
           }
         }
 
@@ -364,14 +391,13 @@ app.get('/', (req: express.Request, res: express.Response) => {
         <ul>
           <li><a href="/health">🏥 Health Check</a></li>
           <li><a href="/webhooks/test">🧪 Webhook Test</a></li>
-          <li><a href="/auth?shop=testcrump1">🔗 OAuth Installation (testcrump1)</a></li>
-          <li><a href="/app?shop=testcrump1.myshopify.com">📱 Embedded App Preview</a></li>
+          <li><a href="/setup">🚀 Smart Setup Flow</a></li>
         </ul>
-        <h3>🧪 Test New User Flow:</h3>
+        <h3>🧪 Test Stores:</h3>
         <ul>
-          <li><a href="/auth?shop=newstore">🆕 Install App (newstore)</a></li>
-          <li><a href="/auth?shop=demostore">🆕 Install App (demostore)</a></li>
-          <li><a href="/auth?shop=teststore">🆕 Install App (teststore)</a></li>
+          <li><a href="/auth?shop=testcrump1">🆕 Install App (testcrump1)</a></li>
+          <li><a href="/auth?shop=testcrump2">🆕 Install App (testcrump2)</a></li>
+          <li><a href="/auth?shop=crumpskin">🆕 Install App (crumpskin)</a></li>
         </ul>
         <h3>📋 Integration Status:</h3>
         <p>✅ Server Running<br/>
@@ -386,12 +412,300 @@ app.get('/', (req: express.Request, res: express.Response) => {
         
         <h3>📝 How to Test:</h3>
         <ol>
-          <li>Click one of the "Install App" links above</li>
-          <li>This will simulate a new store installing the app</li>
+          <li>Try the <strong>Smart Setup Flow</strong> above for the full experience</li>
+          <li>Or click one of the "Install App" links for direct installation</li>
           <li>After installation, you'll be redirected to the embedded app</li>
           <li>Click "Connect to Notion" to test the OAuth flow</li>
         </ol>
       </body>
+    </html>
+  `);
+});
+
+// Smart Setup Flow - The main landing page users will see
+app.get('/setup', (req: express.Request, res: express.Response) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>NotionSync - Setup Your Order Tracking</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .container {
+          background: white;
+          border-radius: 16px;
+          padding: 40px;
+          max-width: 600px;
+          width: 90%;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 40px;
+        }
+        .title {
+          font-size: 32px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin-bottom: 8px;
+        }
+        .subtitle {
+          font-size: 18px;
+          color: #666;
+          margin-bottom: 20px;
+        }
+        .template-preview {
+          background: #f8f9fa;
+          border: 2px dashed #dee2e6;
+          border-radius: 12px;
+          padding: 30px;
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .template-title {
+          font-size: 20px;
+          font-weight: 600;
+          color: #495057;
+          margin-bottom: 10px;
+        }
+        .template-description {
+          color: #6c757d;
+          margin-bottom: 20px;
+        }
+        .template-features {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 20px;
+          text-align: left;
+        }
+        .feature {
+          display: flex;
+          align-items: center;
+          font-size: 14px;
+          color: #495057;
+        }
+        .feature::before {
+          content: "✅";
+          margin-right: 8px;
+        }
+        .setup-form {
+          background: #fff;
+          border: 1px solid #e9ecef;
+          border-radius: 12px;
+          padding: 30px;
+        }
+        .form-group {
+          margin-bottom: 20px;
+        }
+        .label {
+          display: block;
+          font-weight: 600;
+          color: #495057;
+          margin-bottom: 8px;
+        }
+        .input {
+          width: 100%;
+          padding: 12px 16px;
+          border: 2px solid #e9ecef;
+          border-radius: 8px;
+          font-size: 16px;
+          transition: border-color 0.2s;
+        }
+        .input:focus {
+          outline: none;
+          border-color: #667eea;
+        }
+        .help-text {
+          font-size: 14px;
+          color: #6c757d;
+          margin-top: 4px;
+        }
+        .setup-button {
+          width: 100%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          padding: 16px 24px;
+          border-radius: 8px;
+          font-size: 18px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+        .setup-button:hover {
+          transform: translateY(-2px);
+        }
+        .setup-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .error {
+          background: #f8d7da;
+          color: #721c24;
+          padding: 12px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          display: none;
+        }
+        .steps {
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #e9ecef;
+        }
+        .steps-title {
+          font-weight: 600;
+          color: #495057;
+          margin-bottom: 15px;
+        }
+        .step {
+          display: flex;
+          align-items: center;
+          margin-bottom: 10px;
+          font-size: 14px;
+          color: #6c757d;
+        }
+        .step-number {
+          background: #667eea;
+          color: white;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 600;
+          margin-right: 12px;
+          font-size: 12px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1 class="title">🎯 NotionSync</h1>
+          <p class="subtitle">Automatically sync your Shopify orders to a beautiful Notion database</p>
+        </div>
+
+        <div class="template-preview">
+          <h3 class="template-title">📊 Your Personal Order Tracking Database</h3>
+          <p class="template-description">We'll create a custom Notion database just for you with all the fields you need</p>
+          
+          <div class="template-features">
+            <div class="feature">Customer Details</div>
+            <div class="feature">Order Information</div>
+            <div class="feature">Shipping Address</div>
+            <div class="feature">Order Status</div>
+            <div class="feature">Total Price</div>
+            <div class="feature">Items Purchased</div>
+            <div class="feature">Shopify Admin Link</div>
+            <div class="feature">Custom Notes Field</div>
+          </div>
+        </div>
+
+        <div class="setup-form">
+          <div class="error" id="errorMessage"></div>
+          
+          <div class="form-group">
+            <label class="label" for="shopName">Your Shopify Store Name</label>
+            <input 
+              type="text" 
+              id="shopName" 
+              class="input" 
+              placeholder="e.g., mystore (without .myshopify.com)"
+              required
+            />
+            <div class="help-text">Enter just your store name, we'll handle the rest</div>
+          </div>
+
+          <button class="setup-button" onclick="startSetup()" id="setupButton">
+            🚀 Connect Store & Create Database
+          </button>
+
+          <div class="steps">
+            <div class="steps-title">What happens next:</div>
+            <div class="step">
+              <div class="step-number">1</div>
+              <div>Connect to your Shopify store (secure OAuth)</div>
+            </div>
+            <div class="step">
+              <div class="step-number">2</div>
+              <div>Connect to your Notion workspace</div>
+            </div>
+            <div class="step">
+              <div class="step-number">3</div>
+              <div>Create your personal order tracking database</div>
+            </div>
+            <div class="step">
+              <div class="step-number">4</div>
+              <div>Set up automatic order syncing</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        function showError(message) {
+          const errorDiv = document.getElementById('errorMessage');
+          errorDiv.textContent = message;
+          errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+          const errorDiv = document.getElementById('errorMessage');
+          errorDiv.style.display = 'none';
+        }
+
+        function startSetup() {
+          hideError();
+          
+          const shopName = document.getElementById('shopName').value.trim();
+          const setupButton = document.getElementById('setupButton');
+          
+          if (!shopName) {
+            showError('Please enter your Shopify store name');
+            return;
+          }
+
+          // Clean shop name (remove .myshopify.com if present)
+          const cleanShopName = shopName.replace('.myshopify.com', '').toLowerCase();
+          
+          // Validate shop name format
+          if (!/^[a-z0-9-]+$/.test(cleanShopName)) {
+            showError('Store name can only contain letters, numbers, and hyphens');
+            return;
+          }
+
+          // Update button state
+          setupButton.textContent = '⏳ Starting setup...';
+          setupButton.disabled = true;
+
+          // Start the OAuth flow with a special parameter to indicate this is from setup
+          const setupUrl = '/auth?shop=' + cleanShopName + '&source=setup';
+          
+          // Redirect to OAuth flow
+          window.location.href = setupUrl;
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('shopName').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            startSetup();
+          }
+        });
+      </script>
+    </body>
     </html>
   `);
 });
