@@ -204,7 +204,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                   🔗 Open My Notion Dashboard
                 </button>
                 <div style="margin-top: 8px;">
-                  <a href="/redirect/notion/212e8f5ac14a807fb67ac1887df275d5" target="_blank" style="color: #0066cc; text-decoration: underline; font-size: 14px;">
+                  <a href="#" id="directNotionLink" target="_blank" style="color: #0066cc; text-decoration: underline; font-size: 14px;">
                     Or click here to open Notion directly
                   </a>
                 </div>
@@ -374,6 +374,12 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           hideAllStates();
           const connected = document.getElementById('databaseConnected');
           if (connected) connected.style.display = 'block';
+          
+          // Update the direct link with correct database ID
+          const directLink = document.getElementById('directNotionLink');
+          if (directLink && dbId) {
+            directLink.href = `/redirect/notion/${dbId}`;
+          }
         }
 
         function showDatabaseNotConnected() {
@@ -436,16 +442,12 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
         function openUserDatabase() {
           if (currentNotionDbId) {
-            // Use our redirect endpoint to avoid iframe CSP issues
-            const redirectUrl = '/redirect/notion/' + currentNotionDbId;
-            console.log('Redirecting to:', redirectUrl);
+            // Direct redirect to the Notion database
+            const notionUrl = `https://www.notion.so/${currentNotionDbId.replace(/-/g, '')}`;
+            console.log('Opening Notion database:', notionUrl);
             
-            // Use Shopify App Bridge to redirect to our endpoint
-            const redirect = Redirect.create(app);
-            redirect.dispatch(Redirect.Action.REMOTE, {
-              url: redirectUrl,
-              newContext: true
-            });
+            // Open in new tab
+            window.open(notionUrl, '_blank');
           } else {
             console.log('No database ID available');
             const toast = Toast.create(app, {
