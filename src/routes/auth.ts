@@ -886,4 +886,66 @@ router.get('/debug-fix-user', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /auth/force-connect
+ * Force connect a shop to a database (bypasses all session checks)
+ */
+router.post('/force-connect', async (req: Request, res: Response) => {
+  try {
+    const { shopName, notionDbId, email } = req.body;
+
+    if (!shopName || !notionDbId) {
+      return res.status(400).json({
+        error: 'Missing required fields: shopName and notionDbId'
+      });
+    }
+
+    console.log(`🔧 FORCE CONNECT: ${shopName} → ${notionDbId}`);
+
+    const userEmail = email || `${shopName}@shopify.local`;
+    
+    // Create user with the database ID directly
+    const user = await userStoreService.createOrGetUser(
+      userEmail,
+      process.env.NOTION_TOKEN || '',
+      notionDbId
+    );
+
+    console.log(`✅ Created/got user: ${user.id}`);
+
+    // Force add store connection
+    await userStoreService.addStoreToUser(
+      user.id,
+      shopName,
+      `${shopName}.myshopify.com`,
+      process.env.SHOPIFY_ACCESS_TOKEN || 'dummy-token'
+    );
+
+    console.log(`🔗 Force connected ${shopName} to user ${user.id}`);
+
+    // Verify it worked
+    const verification = await userStoreService.getAllUsersWithStore(shopName);
+    console.log(`🔍 Verification: Found ${verification.length} users with store ${shopName}`);
+
+    res.json({
+      success: true,
+      message: `Force connected ${shopName} to database ${notionDbId}`,
+      data: {
+        userId: user.id,
+        shopName,
+        notionDbId,
+        userEmail,
+        verification: verification.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in force connect:', error);
+    res.status(500).json({
+      error: 'Failed to force connect',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
