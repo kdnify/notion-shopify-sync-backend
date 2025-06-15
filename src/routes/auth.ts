@@ -104,25 +104,13 @@ router.get('/callback', async (req: Request, res: Response) => {
     const shopName = (shop as string).replace('.myshopify.com', '');
 
     // Parse state to get user info
-    let userInfo = { email: '', notionToken: '', notionDbId: '' };
+    let userInfo = { email: '', notionToken: '', notionDbId: '', source: 'direct' };
     if (state && typeof state === 'string') {
       try {
         userInfo = JSON.parse(state);
       } catch (e) {
         console.warn('Failed to parse state:', e);
       }
-    }
-
-    // Use fallback values if not provided
-    const email = userInfo.email || `user-${shopName}@shopify.local`;
-    const notionToken = userInfo.notionToken || process.env.NOTION_TOKEN || '';
-    const notionDbId = userInfo.notionDbId || process.env.NOTION_DB_ID || '';
-
-    if (!notionToken || !notionDbId) {
-      console.error('❌ Missing Notion configuration');
-      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-      const errorUrl = `${appUrl}/app?shop=${shopName}.myshopify.com&error=${encodeURIComponent('Notion configuration missing. Please contact support.')}`;
-      return res.redirect(errorUrl);
     }
 
     // Exchange code for access token
@@ -133,50 +121,46 @@ router.get('/callback', async (req: Request, res: Response) => {
     const shopInfo = await shopifyService.getShopInfo(shopName, accessToken);
     console.log(`🏪 Shop info: ${shopInfo.name} (${shopInfo.domain})`);
 
-    // Create or get user
-    const user = await userStoreService.createOrGetUser(email, notionToken, notionDbId);
+    // 🆕 ROBUST USER CREATION - This is the critical fix
+    const email = userInfo.email || `${shopName}@shopify.local`;
+    let user;
     
-    // Add store to user
-    await userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
-
-    // 🆕 AUTO-CREATE PERSONAL NOTION DATABASE
     try {
-      console.log(`🏗️ Creating personal Notion database for ${shopName}...`);
-      
-      // Call our personal database creation endpoint internally
-      const createDbResponse = await fetch(`${req.protocol}://${req.get('host')}/notion/create-db-with-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          shopDomain: shopInfo.domain,
-          accessToken: notionToken, // Use user's personal Notion token
-          workspaceId: 'user-workspace' // Will be handled by the endpoint
-        })
-      });
-
-      if (createDbResponse.ok) {
-        const dbResult = await createDbResponse.json() as { success: boolean; dbId: string; message: string };
-        console.log(`✅ Created personal database: ${dbResult.dbId}`);
-        
-        // Update user with the new personal database ID
-        const updateSuccess = await userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
-        console.log(`📊 Updated user ${user.id} with personal database: ${dbResult.dbId} - Success: ${updateSuccess}`);
-        
-        // Verify the update worked
-        const updatedUser = await userStoreService.getUser(user.id);
-        console.log(`🔍 Verification - User ${user.id} now has database: ${updatedUser?.notionDbId}`);
-      } else {
-        const errorText = await createDbResponse.text();
-        console.warn(`⚠️ Failed to create personal database for ${shopName}: ${errorText}`);
-      }
-    } catch (dbError) {
-      console.warn(`⚠️ Database creation failed for ${shopName}:`, dbError instanceof Error ? dbError.message : dbError);
-      // Continue with default database - don't break the installation
+      // Try to get existing user first
+      user = await userStoreService.getUserByEmail(email);
+      console.log(`✅ Found existing user: ${user.id}`);
+    } catch {
+      // User doesn't exist, create with minimal required info
+      console.log(`🆕 Creating new user for ${shopName}`);
+      user = await userStoreService.createOrGetUser(
+        email,
+        process.env.NOTION_TOKEN || '', // Use system token initially
+        '' // No database ID yet - will be set after creation
+      );
+      console.log(`✅ Created new user: ${user.id}`);
     }
 
-    // Create order webhook (non-blocking)
+    if (!user) {
+      throw new Error('Failed to create or get user');
+    }
+
+    // TypeScript assertion - we know user exists after the check above
+    const validUser = user;
+
+    // 🆕 ENSURE STORE CONNECTION - Critical for webhook routing
+    try {
+      await userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
+      console.log(`🔗 Connected store ${shopName} to user ${user.id}`);
+      
+      // Verify the connection was created
+      const verification = await userStoreService.getAllUsersWithStore(shopName);
+      console.log(`🔍 Verification: Found ${verification.length} users with store ${shopName}`);
+    } catch (storeError) {
+      console.error(`❌ Failed to connect store:`, storeError);
+      // Don't fail the whole flow, but log it
+    }
+
+    // Create order webhook pointing to n8n
     try {
       const webhook = await shopifyService.createOrderWebhook(shopName, accessToken);
       console.log(`🎯 Created webhook with ID: ${webhook.webhook.id}`);
@@ -187,39 +171,72 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // Create session for user
     const sessionId = userStoreService.createSession(user.id);
+    console.log(`🎫 Created session: ${sessionId}`);
 
-    // Check if this is from the setup flow
-    const isSetupFlow = req.query.state && typeof req.query.state === 'string' && 
-                       JSON.parse(req.query.state).source === 'setup';
-
-    // Redirect to embedded app interface
+    // 🎯 SEAMLESS REDIRECT TO NOTION OAUTH
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-    let redirectUrl;
     
-    if (isSetupFlow) {
-      // For setup flow, redirect to app with setup parameter to auto-trigger Notion connection
-      redirectUrl = `${appUrl}/app?shop=${shopInfo.domain}&installed=true&setup=true`;
-    } else {
-      // Normal installation flow
-      redirectUrl = `${appUrl}/app?shop=${shopInfo.domain}&installed=true`;
-    }
+    // Instead of redirecting to app, redirect directly to Notion OAuth for seamless flow
+    const notionOAuthUrl = `${appUrl}/auth/notion-oauth?shop=${shopInfo.domain}&session=${sessionId}`;
     
-    console.log(`🔄 Redirecting to embedded app: ${redirectUrl}`);
-    res.redirect(redirectUrl);
-
-    console.log(`🎉 Successfully installed app for ${shopName} (User: ${user.id})`);
+    console.log(`🔄 Redirecting to seamless Notion OAuth: ${notionOAuthUrl}`);
+    res.redirect(notionOAuthUrl);
 
   } catch (error) {
     console.error('❌ Error in OAuth callback:', error);
-    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
-    // Redirect to embedded app with error instead of returning JSON
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-    const shopName = req.query.shop ? (req.query.shop as string).replace('.myshopify.com', '') : 'unknown';
-    const errorMessage = error instanceof Error ? error.message : 'Failed to complete OAuth flow';
-    const errorUrl = `${appUrl}/app?shop=${shopName}.myshopify.com&error=${encodeURIComponent(errorMessage)}`;
+    res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('OAuth failed')}`);
+  }
+});
+
+/**
+ * GET /auth/notion-oauth
+ * Seamless Notion OAuth initiation
+ */
+router.get('/notion-oauth', async (req: Request, res: Response) => {
+  try {
+    const { shop, session } = req.query;
     
-    res.redirect(errorUrl);
+    if (!shop || !session) {
+      return res.status(400).json({
+        error: 'Missing required parameters: shop and session'
+      });
+    }
+
+    // Verify session
+    const user = await userStoreService.getUserBySession(session as string);
+    if (!user) {
+      return res.status(401).json({
+        error: 'Invalid or expired session'
+      });
+    }
+
+    console.log(`🔐 Initiating Notion OAuth for user ${user.id} and shop ${shop}`);
+
+    // Notion OAuth configuration
+    const clientId = process.env.NOTION_OAUTH_CLIENT_ID || '212d872b-594c-80fd-ae95-0037202a219e';
+    const redirectUri = 'https://notion-shopify-sync-backend.onrender.com/auth/notion-callback';
+    
+    const state = encodeURIComponent(JSON.stringify({
+      shop: shop,
+      userId: user.id,
+      sessionId: session
+    }));
+
+    const notionOAuthUrl = `https://api.notion.com/v1/oauth/authorize?` +
+      `client_id=${clientId}&` +
+      `response_type=code&` +
+      `owner=user&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `state=${state}`;
+
+    console.log(`🔄 Redirecting to Notion OAuth: ${notionOAuthUrl}`);
+    res.redirect(notionOAuthUrl);
+
+  } catch (error) {
+    console.error('❌ Error in Notion OAuth initiation:', error);
+    const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+    res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Notion OAuth initiation failed')}`);
   }
 });
 
@@ -740,9 +757,19 @@ router.post('/manual-connect', async (req: Request, res: Response) => {
     try {
       user = await userStoreService.getUserByEmail(email || `user-${shopName}@shopify.local`);
     } catch {
-      // User doesn't exist, let's try a different approach
-      console.log(`⚠️ User not found, will create during store connection`);
-      user = null;
+      // User doesn't exist, create one
+      console.log(`🆕 Creating user for ${shopName}`);
+      user = await userStoreService.createOrGetUser(
+        email || `user-${shopName}@shopify.local`,
+        process.env.NOTION_TOKEN || '',
+        notionDbId
+      );
+    }
+
+    if (!user) {
+      return res.status(500).json({
+        error: 'Failed to create or get user'
+      });
     }
 
     // Update database ID
