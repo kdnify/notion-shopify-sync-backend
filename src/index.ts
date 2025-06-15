@@ -443,7 +443,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
         function openUserDatabase() {
           if (currentNotionDbId) {
             // Direct redirect to the Notion database
-            const notionUrl = `https://www.notion.so/${currentNotionDbId.replace(/-/g, '')}`;
+            const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
             console.log('Opening Notion database:', notionUrl);
             
             // Open in new tab
