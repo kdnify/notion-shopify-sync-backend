@@ -84,8 +84,16 @@ export class NotionService {
         // Map to exact property names in the user's database
         switch (propName) {
           case 'Customer Name':
+            console.log(`🔍 Customer Name debug:`, {
+              hasCustomer: !!order.customer,
+              firstName: order.customer?.first_name,
+              lastName: order.customer?.last_name,
+              fullName: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : 'none'
+            });
+            
             if (order.customer) {
               const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim();
+              // Show actual customer name even if it's a placeholder, for debugging
               if (customerName && customerName !== 'Manual Order No Customer') {
                 properties[propName] = {
                   rich_text: [
@@ -97,6 +105,19 @@ export class NotionService {
                   ],
                 };
                 console.log(`📝 Setting "${propName}" to: ${customerName}`);
+              } else {
+                // For manual orders, show what we have
+                const displayName = customerName || 'Manual Order';
+                properties[propName] = {
+                  rich_text: [
+                    {
+                      text: {
+                        content: displayName,
+                      },
+                    },
+                  ],
+                };
+                console.log(`📝 Setting "${propName}" to: ${displayName} (manual order)`);
               }
             }
             break;
@@ -109,20 +130,20 @@ export class NotionService {
             });
             
             if (order.customer?.email) {
-              // For testing purposes, allow placeholder emails but mark them
-              let emailToSet = order.customer.email;
+              // For debugging, let's see what email we're getting
+              console.log(`📧 Processing email: "${order.customer.email}"`);
               
-              // Only skip truly invalid emails
-              if (order.customer.email === 'no-email@manual-order.com') {
-                console.log(`⚠️ Skipping placeholder email: ${order.customer.email}`);
-                // Skip this field for placeholder emails
-                break;
-              }
-              
-              properties[propName] = {
-                email: emailToSet,
-              };
-              console.log(`📝 Setting "${propName}" to: ${emailToSet}`);
+                             // Only skip truly placeholder emails
+               if (order.customer.email === 'no-email@manual-order.com') {
+                 console.log(`⚠️ Skipping placeholder email: ${order.customer.email}`);
+                 // Skip this field for placeholder emails (email field type requires valid email)
+               } else {
+                 // Real email
+                 properties[propName] = {
+                   email: order.customer.email,
+                 };
+                 console.log(`📝 Setting "${propName}" to: ${order.customer.email}`);
+               }
             } else {
               console.log(`⚠️ No customer email found or email is undefined`);
             }

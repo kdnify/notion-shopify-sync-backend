@@ -534,6 +534,8 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
         console.log(`  - shippingAddress: ${order.shippingAddress}`);
         console.log(`  - note: ${order.note}`);
         console.log(`  - shopDomain: ${order.shopDomain}`);
+        console.log(`  - customerName: ${order.customerName}`);
+        console.log(`  - customerEmail: ${order.customerEmail}`);
         
         // Extract shop domain from order data (your n8n workflow sends this as shopDomain)
         let shopDomain = order.shopDomain || order.shop || order.storeName;
@@ -562,10 +564,10 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
           processed_at: order.createdAt,
           customer: {
             id: parseInt(order.orderId) || 0,
-            first_name: order.customerName && order.customerName !== 'Manual Order - No Customer' 
+            first_name: order.customerName && order.customerName !== 'Manual Order - No Customer' && order.customerName !== 'Unknown Customer'
               ? order.customerName.split(' ')[0] 
               : 'Manual Order',
-            last_name: order.customerName && order.customerName !== 'Manual Order - No Customer'
+            last_name: order.customerName && order.customerName !== 'Manual Order - No Customer' && order.customerName !== 'Unknown Customer'
               ? order.customerName.split(' ').slice(1).join(' ') || 'Customer'
               : 'No Customer',
             email: order.customerEmail || undefined,
