@@ -226,4 +226,85 @@ router.get('/test', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/sync-to-notion
+ * Endpoint for n8n to sync processed order data to user's Notion database
+ * This bypasses the need for n8n to have Notion credentials
+ */
+router.post('/sync-to-notion', async (req: Request, res: Response) => {
+  try {
+    const { shopDomain, orderData } = req.body;
+
+    if (!shopDomain || !orderData) {
+      return res.status(400).json({
+        error: 'Missing required fields: shopDomain and orderData'
+      });
+    }
+
+    console.log(`🔄 Syncing order to Notion for shop: ${shopDomain}`);
+
+    // Extract shop name from domain
+    const shopName = shopDomain.replace('.myshopify.com', '');
+
+    // Find users with this store
+    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      console.warn(`⚠️ No users found for shop: ${shopName}`);
+      return res.status(404).json({
+        error: 'No users found for this shop'
+      });
+    }
+
+    const results = [];
+
+    // Sync to each user's personal Notion database
+    for (const { user } of usersWithStore) {
+      try {
+        console.log(`📝 Creating Notion page for user ${user.id} with DB: ${user.notionDbId}`);
+
+        // Use user's personal database and token
+        const notionService = new NotionService(user.notionToken, user.notionDbId);
+        
+        // Create order page in user's personal database
+        const pageId = await notionService.createOrderPage(orderData);
+        
+        results.push({
+          userId: user.id,
+          pageId: pageId,
+          success: true
+        });
+
+        console.log(`✅ Successfully synced order to Notion for user ${user.id}`);
+
+      } catch (userError) {
+        console.error(`❌ Failed to sync for user ${user.id}:`, userError);
+        results.push({
+          userId: user.id,
+          success: false,
+          error: userError instanceof Error ? userError.message : 'Unknown error'
+        });
+      }
+    }
+
+    // Return results
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+
+    res.json({
+      success: true,
+      message: `Synced to ${successCount}/${totalCount} user databases`,
+      shopDomain,
+      results
+    });
+
+  } catch (error) {
+    console.error('❌ Error in sync-to-notion endpoint:', error);
+    res.status(500).json({
+      error: 'Failed to sync to Notion',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
