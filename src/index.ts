@@ -378,7 +378,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           // Update the direct link with correct database ID
           const directLink = document.getElementById('directNotionLink');
           if (directLink && dbId) {
-            directLink.href = `/redirect/notion/${dbId}`;
+            directLink.href = '/redirect/notion/' + dbId;
           }
         }
 
