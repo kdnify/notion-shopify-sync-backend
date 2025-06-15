@@ -158,10 +158,15 @@ router.get('/callback', async (req: Request, res: Response) => {
         console.log(`✅ Created personal database: ${dbResult.dbId}`);
         
         // Update user with the new personal database ID
-        userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
-        console.log(`📊 Updated user ${user.id} with personal database: ${dbResult.dbId}`);
+        const updateSuccess = userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
+        console.log(`📊 Updated user ${user.id} with personal database: ${dbResult.dbId} - Success: ${updateSuccess}`);
+        
+        // Verify the update worked
+        const updatedUser = userStoreService.getUser(user.id);
+        console.log(`🔍 Verification - User ${user.id} now has database: ${updatedUser?.notionDbId}`);
       } else {
-        console.warn(`⚠️ Failed to create personal database for ${shopName}, using default`);
+        const errorText = await createDbResponse.text();
+        console.warn(`⚠️ Failed to create personal database for ${shopName}: ${errorText}`);
       }
     } catch (dbError) {
       console.warn(`⚠️ Database creation failed for ${shopName}:`, dbError instanceof Error ? dbError.message : dbError);
@@ -382,6 +387,57 @@ router.get('/webhooks-debug', async (req: Request, res: Response) => {
       error: 'Internal Server Error',
       message: 'Failed to list webhooks',
       details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * GET /auth/user-info
+ * Get user information including notion database ID for a shop
+ */
+router.get('/user-info', (req: Request, res: Response) => {
+  try {
+    const { shop } = req.query;
+    
+    if (!shop || typeof shop !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Missing shop parameter'
+      });
+    }
+
+    // Clean shop name
+    const shopName = shop.replace('.myshopify.com', '');
+    
+    // Find users with this store
+    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      return res.status(404).json({
+        error: 'Store Not Found',
+        message: `No users found with store ${shopName} connected`
+      });
+    }
+
+    // Return info for the first user (could be enhanced to handle multiple users)
+    const { user } = usersWithStore[0];
+    
+    res.json({
+      success: true,
+      data: {
+        userId: user.id,
+        email: user.email,
+        notionDbId: user.notionDbId,
+        shopName: shopName,
+        hasDatabase: !!user.notionDbId
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting user info:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to get user information'
     });
   }
 });

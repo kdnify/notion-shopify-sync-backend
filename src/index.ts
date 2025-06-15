@@ -198,43 +198,59 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           <button class="sync-button" onclick="testSync()">🔄 Test Sync</button>
           <button class="sync-button" onclick="viewLogs()">📋 View Logs</button>
           <button class="sync-button" onclick="refreshStatus()">🔍 Refresh Status</button>
+          <button class="sync-button" onclick="initializeApp()" style="background: #0066cc;">🔄 Check Database</button>
         </div>
 
         <div class="settings-section">
-          <h2 class="section-title">🛠 Set Up Your Notion Dashboard</h2>
-          <p style="color: #6d7175; margin-bottom: 16px;">Create your own Notion database to track orders from your store.</p>
+          <h2 class="section-title">📊 Your Notion Database</h2>
+          <div id="databaseInfo" style="display: none;">
+            <div class="status-card" style="background: #f0fff4; border-color: #b3ffcc;">
+              <h3 class="status-title" style="color: #00cc44;">✅ Personal Database Created!</h3>
+              <p style="margin: 8px 0; color: #202223;">Your personal Notion database is ready and syncing orders automatically.</p>
+              <div style="margin-top: 16px;">
+                <button class="sync-button" onclick="openUserDatabase()" style="background: #0066cc;">
+                  🔗 Open My Notion Dashboard
+                </button>
+                <span id="databaseUrl" style="font-size: 12px; color: #6d7175; margin-left: 12px;"></span>
+              </div>
+            </div>
+          </div>
           
-          <div style="margin-bottom: 20px;">
-            <button class="sync-button" onclick="openNotionTemplate()" style="background: #0066cc;">
-              📋 Copy the Notion Order Tracker
-            </button>
-            <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
-              Opens our Notion template in a new tab. Duplicate it to your workspace.<br/>
-              <a href="https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b&source=copy_link" target="_blank" style="color: #0066cc; text-decoration: underline;">
-                Or click here if the button doesn't work
-              </a>
-            </p>
-          </div>
+          <div id="manualSetup">
+            <p style="color: #6d7175; margin-bottom: 16px;">Create your own Notion database to track orders from your store.</p>
+            
+            <div style="margin-bottom: 20px;">
+              <button class="sync-button" onclick="openNotionTemplate()" style="background: #0066cc;">
+                📋 Copy the Notion Order Tracker
+              </button>
+              <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
+                Opens our Notion template in a new tab. Duplicate it to your workspace.<br/>
+                <a href="https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b&source=copy_link" target="_blank" style="color: #0066cc; text-decoration: underline;">
+                  Or click here if the button doesn't work
+                </a>
+              </p>
+            </div>
 
-          <div style="margin-bottom: 20px;">
-            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #202223;">
-              🔗 Your New Notion Database ID
-            </label>
-            <input 
-              type="text" 
-              id="notionDbId" 
-              placeholder="Paste the ID from your duplicated Notion database URL"
-              style="width: 100%; padding: 12px; border: 1px solid #e1e3e5; border-radius: 6px; font-size: 14px;"
-            />
-            <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
-              💡 Tip: The Database ID is the long string in your Notion database URL after the last slash
-            </p>
-          </div>
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #202223;">
+                🔗 Your New Notion Database ID
+              </label>
+              <input 
+                type="text" 
+                id="notionDbId" 
+                placeholder="Paste the ID from your duplicated Notion database URL"
+                style="width: 100%; padding: 12px; border: 1px solid #e1e3e5; border-radius: 6px; font-size: 14px;"
+              />
+              <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
+                💡 Tip: The Database ID is the long string in your Notion database URL after the last slash
+              </p>
+            </div>
 
-          <div style="margin-bottom: 20px;">
-            <button class="sync-button" onclick="updateNotionDb()" id="updateBtn">
-              ✅ Update My Notion Sync
-            </button>
+            <div style="margin-bottom: 20px;">
+              <button class="sync-button" onclick="updateNotionDb()" id="updateBtn">
+                ✅ Update My Notion Sync
+              </button>
+            </div>
           </div>
 
           <div id="setupStatus" style="display: none; padding: 12px; border-radius: 6px; margin-top: 16px;"></div>
@@ -276,6 +292,67 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           apiKey: '${process.env.SHOPIFY_API_KEY}',
           shopOrigin: '${shop}',
         });
+
+        // App state
+        let currentNotionDbId = null;
+
+        // Initialize app - check for existing database
+        async function initializeApp() {
+          try {
+            const response = await fetch('/auth/user-info?shop=${shop}');
+            if (response.ok) {
+              const userInfo = await response.json();
+              console.log('User info loaded:', userInfo);
+              if (userInfo.success && userInfo.data.notionDbId && userInfo.data.notionDbId.trim() !== '') {
+                currentNotionDbId = userInfo.data.notionDbId;
+                showDatabaseInfo(userInfo.data.notionDbId);
+                console.log('Showing database info for:', userInfo.data.notionDbId);
+              } else {
+                console.log('No database found, showing manual setup');
+                showManualSetup();
+              }
+            } else {
+              console.log('Failed to load user info, showing manual setup');
+              showManualSetup();
+            }
+          } catch (error) {
+            console.log('Could not load user info:', error);
+            showManualSetup();
+          }
+        }
+
+        function showDatabaseInfo(dbId) {
+          const databaseInfo = document.getElementById('databaseInfo');
+          const manualSetup = document.getElementById('manualSetup');
+          const databaseUrl = document.getElementById('databaseUrl');
+          
+          if (databaseInfo && manualSetup) {
+            databaseInfo.style.display = 'block';
+            manualSetup.style.display = 'none';
+            
+            // Set the database URL hint
+            if (databaseUrl) {
+              databaseUrl.textContent = 'Database ID: ' + dbId.substring(0, 8) + '...';
+            }
+          }
+        }
+
+        function showManualSetup() {
+          const databaseInfo = document.getElementById('databaseInfo');
+          const manualSetup = document.getElementById('manualSetup');
+          
+          if (databaseInfo && manualSetup) {
+            databaseInfo.style.display = 'none';
+            manualSetup.style.display = 'block';
+          }
+        }
+
+        function openUserDatabase() {
+          if (currentNotionDbId) {
+            const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
+            window.open(notionUrl, '_blank');
+          }
+        }
 
         // App functions
         function testSync() {
@@ -363,6 +440,10 @@ app.get('/app', (req: express.Request, res: express.Response) => {
               showStatus('✅ Notion database updated successfully! Future orders will sync to your database.', 'success');
               document.getElementById('notionDbId').value = '';
               
+              // Update the display to show the database info
+              currentNotionDbId = notionDbId;
+              showDatabaseInfo(notionDbId);
+              
               const toast = Toast.create(app, {
                 message: '✅ Notion sync updated successfully',
                 duration: 3000
@@ -405,6 +486,9 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           document.getElementById('lastSync').textContent = '2 minutes ago';
           document.getElementById('orderCount').textContent = '12 orders';
         }, 1000);
+
+        // Initialize the app when page loads
+        initializeApp();
       </script>
     </body>
     </html>
