@@ -203,6 +203,11 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                 <button class="sync-button" id="openDatabaseBtn" style="background: #0066cc;">
                   🔗 Open My Notion Dashboard
                 </button>
+                <div style="margin-top: 8px;">
+                  <a href="/redirect/notion/212e8f5ac14a807fb67ac1887df275d5" target="_blank" style="color: #0066cc; text-decoration: underline; font-size: 14px;">
+                    Or click here to open Notion directly
+                  </a>
+                </div>
               </div>
             </div>
           </div>
