@@ -646,4 +646,90 @@ router.get('/debug', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/test-create
+ * Test endpoint to create a simple page with obvious content
+ */
+router.post('/test-create', async (req: Request, res: Response) => {
+  try {
+    console.log('🧪 Test create endpoint called');
+
+    if (!notionService) {
+      return res.status(500).json({
+        error: 'Notion service not initialized'
+      });
+    }
+
+    // Create a test order with obvious content
+    const testOrder = {
+      id: 999999,
+      order_number: 999999,
+      name: '#999999 - TEST ORDER - DELETE ME',
+      email: 'test@example.com',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_price: '123.45',
+      subtotal_price: '100.00',
+      total_tax: '23.45',
+      currency: 'USD',
+      financial_status: 'paid',
+      fulfillment_status: 'unfulfilled',
+      customer: {
+        id: 999999,
+        first_name: 'TEST',
+        last_name: 'CUSTOMER',
+        email: 'test@example.com',
+        phone: null
+      },
+      shipping_address: {
+        first_name: 'TEST',
+        last_name: 'CUSTOMER',
+        address1: '123 Test Street',
+        address2: null,
+        city: 'Test City',
+        province: 'Test State',
+        country: 'Test Country',
+        zip: '12345',
+        phone: null
+      },
+      line_items: [{
+        id: 999999,
+        title: 'TEST PRODUCT - PLEASE DELETE',
+        quantity: 1,
+        price: '100.00',
+        variant_title: null,
+        product_id: 999999,
+        variant_id: 999999
+      }],
+      note: 'This is a test order created by the debug endpoint. Please delete this entry.',
+      order_status_url: 'https://test.example.com/orders/999999'
+    };
+
+    console.log('🧪 Creating test order with obvious content');
+    const pageId = await notionService.createOrderPage(testOrder as any);
+
+    res.json({
+      success: true,
+      message: 'Test order created successfully',
+      data: {
+        pageId: pageId,
+        testOrder: {
+          orderNumber: testOrder.order_number,
+          customerName: `${testOrder.customer.first_name} ${testOrder.customer.last_name}`,
+          totalPrice: testOrder.total_price,
+          status: testOrder.fulfillment_status
+        },
+        instructions: 'Look for order #999999 with customer "TEST CUSTOMER" in your Notion database'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in test-create endpoint:', error);
+    res.status(500).json({
+      error: 'Failed to create test order',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
