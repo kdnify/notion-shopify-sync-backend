@@ -32,6 +32,14 @@ export class NotionService {
   async createOrderPage(order: ShopifyOrder): Promise<string> {
     try {
       console.log(`Creating Notion page for order #${order.order_number}`);
+    
+    // Debug key fields that are having issues
+    console.log(`🔍 Notion service debugging:`);
+    console.log(`  - order.name: ${order.name}`);
+    console.log(`  - order.order_number: ${order.order_number}`);
+    console.log(`  - order.created_at: ${order.created_at}`);
+    console.log(`  - order.note: ${order.note}`);
+    console.log(`  - order.shipping_address: ${JSON.stringify(order.shipping_address)}`);
       console.log('📋 Order data received:', JSON.stringify(order, null, 2));
 
       // Format line items as a readable string
@@ -113,17 +121,29 @@ export class NotionService {
                 ],
               };
               console.log(`📝 Setting items "${propName}" to: ${lineItemsText}`);
-            } else if ((propNameLower.includes('address') || propNameLower.includes('shipping')) && order.shipping_address?.address1) {
+            } else if ((propNameLower.includes('address') || propNameLower.includes('shipping')) && order.shipping_address) {
+              const address = order.shipping_address;
+              const addressText = [
+                address.first_name,
+                address.last_name,
+                address.address1,
+                address.address2,
+                address.city,
+                address.province,
+                address.zip,
+                address.country
+              ].filter(Boolean).join(', ');
+              
               properties[propName] = {
                 rich_text: [
                   {
                     text: {
-                      content: order.shipping_address.address1,
+                      content: addressText || 'No Address',
                     },
                   },
                 ],
               };
-              console.log(`📝 Setting address "${propName}" to: ${order.shipping_address.address1}`);
+              console.log(`📝 Setting address "${propName}" to: ${addressText}`);
             } else if (propNameLower.includes('note') && order.note) {
               properties[propName] = {
                 rich_text: [
@@ -161,7 +181,7 @@ export class NotionService {
             break;
           
           case 'date':
-            if ((propNameLower.includes('created') || propNameLower.includes('order') && propNameLower.includes('date')) && order.created_at) {
+            if ((propNameLower.includes('created') || propNameLower.includes('date') || propNameLower.includes('order')) && order.created_at) {
               properties[propName] = {
                 date: {
                   start: order.created_at,

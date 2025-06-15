@@ -515,6 +515,15 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
         console.log(`📝 Processing order: ${order.orderNumber || 'unknown'}`);
         console.log(`📋 Order data:`, JSON.stringify(order, null, 2));
         
+        // Debug the key fields we're having issues with
+        console.log(`🔍 Key field debugging:`);
+        console.log(`  - orderNumber: ${order.orderNumber} (type: ${typeof order.orderNumber})`);
+        console.log(`  - orderName: ${order.orderName}`);
+        console.log(`  - createdAt: ${order.createdAt}`);
+        console.log(`  - shippingAddress: ${order.shippingAddress}`);
+        console.log(`  - note: ${order.note}`);
+        console.log(`  - shopDomain: ${order.shopDomain}`);
+        
         // Extract shop domain from order data (your n8n workflow sends this as shopDomain)
         let shopDomain = order.shopDomain || order.shop || order.storeName;
         if (!shopDomain) {
