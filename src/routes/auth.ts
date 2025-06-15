@@ -118,8 +118,8 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     if (!notionToken || !notionDbId) {
       console.error('❌ Missing Notion configuration');
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-      const errorUrl = `${frontendUrl}?error=${encodeURIComponent('Notion configuration missing. Please contact support.')}&shop=${shopName}`;
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      const errorUrl = `${appUrl}/app?shop=${shopName}.myshopify.com&error=${encodeURIComponent('Notion configuration missing. Please contact support.')}`;
       return res.redirect(errorUrl);
     }
 
@@ -149,11 +149,11 @@ router.get('/callback', async (req: Request, res: Response) => {
     // Create session for user
     const sessionId = userStoreService.createSession(user.id);
 
-    // Redirect back to frontend with session ID
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const redirectUrl = `${frontendUrl}?success=true&shop=${shopName}`;
+    // Redirect to embedded app interface
+    const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+    const redirectUrl = `${appUrl}/app?shop=${shopInfo.domain}&installed=true`;
     
-    console.log(`🔄 Redirecting to frontend: ${redirectUrl}`);
+    console.log(`🔄 Redirecting to embedded app: ${redirectUrl}`);
     res.redirect(redirectUrl);
 
     console.log(`🎉 Successfully installed app for ${shopName} (User: ${user.id})`);
@@ -162,11 +162,11 @@ router.get('/callback', async (req: Request, res: Response) => {
     console.error('❌ Error in OAuth callback:', error);
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
-    // Redirect to frontend with error instead of returning JSON
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    // Redirect to embedded app with error instead of returning JSON
+    const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
     const shopName = req.query.shop ? (req.query.shop as string).replace('.myshopify.com', '') : 'unknown';
     const errorMessage = error instanceof Error ? error.message : 'Failed to complete OAuth flow';
-    const errorUrl = `${frontendUrl}?error=${encodeURIComponent(errorMessage)}&shop=${shopName}`;
+    const errorUrl = `${appUrl}/app?shop=${shopName}.myshopify.com&error=${encodeURIComponent(errorMessage)}`;
     
     res.redirect(errorUrl);
   }
