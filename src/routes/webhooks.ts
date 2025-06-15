@@ -602,4 +602,48 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /webhooks/debug
+ * Debug endpoint to check current configuration
+ */
+router.get('/debug', async (req: Request, res: Response) => {
+  try {
+    console.log('🔍 Debug endpoint called');
+
+    const config = {
+      notionToken: process.env.NOTION_TOKEN ? '***' + process.env.NOTION_TOKEN.slice(-4) : 'NOT SET',
+      notionDbId: process.env.NOTION_DB_ID || 'NOT SET',
+      shopifySecret: process.env.SHOPIFY_WEBHOOK_SECRET ? 'SET' : 'NOT SET',
+      nodeEnv: process.env.NODE_ENV || 'NOT SET'
+    };
+
+    // Test Notion connection if service is initialized
+    let notionTest = null;
+    if (notionService) {
+      try {
+        const database = await notionService.testConnection();
+        notionTest = { success: database, message: 'Connection tested' };
+      } catch (error) {
+        notionTest = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    res.json({
+      status: 'DEBUG',
+      timestamp: new Date().toISOString(),
+      config: config,
+      notionTest: notionTest,
+      message: 'Debug information retrieved successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error in debug endpoint:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to retrieve debug information',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
