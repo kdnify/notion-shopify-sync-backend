@@ -203,53 +203,30 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
         <div class="settings-section">
           <h2 class="section-title">📊 Your Notion Database</h2>
-          <div id="databaseInfo" style="display: none;">
+          
+          <!-- Database Connected State -->
+          <div id="databaseConnected" style="display: none;">
             <div class="status-card" style="background: #f0fff4; border-color: #b3ffcc;">
-              <h3 class="status-title" style="color: #00cc44;">✅ Personal Database Created!</h3>
+              <h3 class="status-title" style="color: #00cc44;">✅ Connected to Notion!</h3>
               <p style="margin: 8px 0; color: #202223;">Your personal Notion database is ready and syncing orders automatically.</p>
               <div style="margin-top: 16px;">
                 <button class="sync-button" onclick="openUserDatabase()" style="background: #0066cc;">
                   🔗 Open My Notion Dashboard
                 </button>
-                <span id="databaseUrl" style="font-size: 12px; color: #6d7175; margin-left: 12px;"></span>
               </div>
             </div>
           </div>
           
-          <div id="manualSetup">
-            <p style="color: #6d7175; margin-bottom: 16px;">Create your own Notion database to track orders from your store.</p>
-            
-            <div style="margin-bottom: 20px;">
-              <button class="sync-button" onclick="openNotionTemplate()" style="background: #0066cc;">
-                📋 Copy the Notion Order Tracker
-              </button>
-              <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
-                Opens our Notion template in a new tab. Duplicate it to your workspace.<br/>
-                <a href="https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b&source=copy_link" target="_blank" style="color: #0066cc; text-decoration: underline;">
-                  Or click here if the button doesn't work
-                </a>
-              </p>
-            </div>
-
-            <div style="margin-bottom: 20px;">
-              <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #202223;">
-                🔗 Your New Notion Database ID
-              </label>
-              <input 
-                type="text" 
-                id="notionDbId" 
-                placeholder="Paste the ID from your duplicated Notion database URL"
-                style="width: 100%; padding: 12px; border: 1px solid #e1e3e5; border-radius: 6px; font-size: 14px;"
-              />
-              <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
-                💡 Tip: The Database ID is the long string in your Notion database URL after the last slash
-              </p>
-            </div>
-
-            <div style="margin-bottom: 20px;">
-              <button class="sync-button" onclick="updateNotionDb()" id="updateBtn">
-                ✅ Update My Notion Sync
-              </button>
+          <!-- Not Connected State -->
+          <div id="databaseNotConnected">
+            <div class="status-card" style="background: #fff9e6; border-color: #ffeb99;">
+              <h3 class="status-title" style="color: #cc7a00;">🔗 Connect Your Notion</h3>
+              <p style="margin: 8px 0; color: #202223;">Connect to Notion to automatically create your personal order tracking database.</p>
+              <div style="margin-top: 16px;">
+                <button class="sync-button" onclick="connectToNotion()" style="background: #0066cc;" id="connectBtn">
+                  🔗 Connect to Notion
+                </button>
+              </div>
             </div>
           </div>
 
@@ -305,46 +282,66 @@ app.get('/app', (req: express.Request, res: express.Response) => {
               console.log('User info loaded:', userInfo);
               if (userInfo.success && userInfo.data.notionDbId && userInfo.data.notionDbId.trim() !== '') {
                 currentNotionDbId = userInfo.data.notionDbId;
-                showDatabaseInfo(userInfo.data.notionDbId);
-                console.log('Showing database info for:', userInfo.data.notionDbId);
+                showDatabaseConnected(userInfo.data.notionDbId);
+                console.log('Database connected:', userInfo.data.notionDbId);
               } else {
-                console.log('No database found, showing manual setup');
-                showManualSetup();
+                console.log('No database found, showing connect option');
+                showDatabaseNotConnected();
               }
             } else {
-              console.log('Failed to load user info, showing manual setup');
-              showManualSetup();
+              console.log('Failed to load user info, showing connect option');
+              showDatabaseNotConnected();
             }
           } catch (error) {
             console.log('Could not load user info:', error);
-            showManualSetup();
+            showDatabaseNotConnected();
           }
         }
 
-        function showDatabaseInfo(dbId) {
-          const databaseInfo = document.getElementById('databaseInfo');
-          const manualSetup = document.getElementById('manualSetup');
-          const databaseUrl = document.getElementById('databaseUrl');
+        function showDatabaseConnected(dbId) {
+          const connected = document.getElementById('databaseConnected');
+          const notConnected = document.getElementById('databaseNotConnected');
           
-          if (databaseInfo && manualSetup) {
-            databaseInfo.style.display = 'block';
-            manualSetup.style.display = 'none';
-            
-            // Set the database URL hint
-            if (databaseUrl) {
-              databaseUrl.textContent = 'Database ID: ' + dbId.substring(0, 8) + '...';
-            }
+          if (connected && notConnected) {
+            connected.style.display = 'block';
+            notConnected.style.display = 'none';
           }
         }
 
-        function showManualSetup() {
-          const databaseInfo = document.getElementById('databaseInfo');
-          const manualSetup = document.getElementById('manualSetup');
+        function showDatabaseNotConnected() {
+          const connected = document.getElementById('databaseConnected');
+          const notConnected = document.getElementById('databaseNotConnected');
           
-          if (databaseInfo && manualSetup) {
-            databaseInfo.style.display = 'none';
-            manualSetup.style.display = 'block';
+          if (connected && notConnected) {
+            connected.style.display = 'none';
+            notConnected.style.display = 'block';
           }
+        }
+
+        function connectToNotion() {
+          const connectBtn = document.getElementById('connectBtn');
+          if (connectBtn) {
+            connectBtn.textContent = '⏳ Connecting...';
+            connectBtn.disabled = true;
+          }
+
+          // Build Notion OAuth URL
+          const clientId = '212d872b-594c-80fd-ae95-0037202a219e';
+          const redirectUri = encodeURIComponent('${req.protocol}://${req.get('host')}/auth/notion-callback');
+          const state = encodeURIComponent(JSON.stringify({
+            shop: '${shop}',
+            source: 'embedded_app'
+          }));
+          
+          const notionOAuthUrl = 'https://api.notion.com/v1/oauth/authorize?' +
+            'client_id=' + clientId +
+            '&response_type=code' +
+            '&owner=user' +
+            '&redirect_uri=' + redirectUri +
+            '&state=' + state;
+
+          // Redirect to Notion OAuth
+          window.location.href = notionOAuthUrl;
         }
 
         function openUserDatabase() {

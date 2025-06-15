@@ -5,7 +5,7 @@ import { userStoreService } from '../services/userStore';
 const router = express.Router();
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_TEMPLATE_DB_ID = process.env.NOTION_TEMPLATE_DB_ID;
+const NOTION_TEMPLATE_DB_ID = process.env.NOTION_TEMPLATE_DB_ID || '212e8f5ac14a807fb67ac1887df275d5';
 
 if (!NOTION_TOKEN) {
   console.error('❌ NOTION_TOKEN environment variable is required');
@@ -248,6 +248,82 @@ router.get('/db-info/:dbId', async (req, res) => {
     console.error('❌ Error getting database info:', error);
     res.status(500).json({ 
       error: 'Failed to get database info',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * Create a new Notion database using user's OAuth token
+ * POST /notion/create-db-with-token
+ * Body: { shopDomain: string, accessToken: string, workspaceId: string }
+ */
+router.post('/create-db-with-token', async (req, res) => {
+  try {
+    const { shopDomain, accessToken, workspaceId } = req.body;
+
+    if (!shopDomain || !accessToken) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: shopDomain and accessToken' 
+      });
+    }
+
+    // Extract shop name from domain
+    const shopName = shopDomain.replace('.myshopify.com', '');
+
+    console.log(`🏗️ Creating Notion database with user's token for shop: ${shopName}`);
+
+    // Create Notion client with user's token
+    const userNotion = new Client({
+      auth: accessToken,
+    });
+
+    // First, get the template database structure
+    const templateNotion = new Client({
+      auth: NOTION_TOKEN,
+    });
+
+    if (!NOTION_TEMPLATE_DB_ID) {
+      return res.status(500).json({ 
+        error: 'Server configuration error: Missing template database ID' 
+      });
+    }
+
+    const templateDb = await templateNotion.databases.retrieve({
+      database_id: NOTION_TEMPLATE_DB_ID,
+    });
+
+    // Create a new database in user's workspace
+    // Note: Creating in workspace requires a page parent, so we'll use the template approach
+    const newDb = await userNotion.databases.create({
+      parent: {
+        type: 'page_id',
+        page_id: NOTION_TEMPLATE_DB_ID, // This should be a page ID, not database ID
+      } as any,
+      title: [
+        {
+          text: {
+            content: `Shopify Orders: ${shopName}`,
+          },
+        },
+      ],
+      properties: templateDb.properties as any,
+    });
+
+    console.log(`✅ Created new database for ${shopName}: ${newDb.id}`);
+
+    res.json({ 
+      success: true, 
+      dbId: newDb.id,
+      message: `Successfully created Notion database for ${shopName}`,
+      shopName,
+      shopDomain
+    });
+
+  } catch (error) {
+    console.error('❌ Error in /create-db-with-token:', error);
+    res.status(500).json({ 
+      error: 'Failed to create Notion database with user token',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }

@@ -307,4 +307,170 @@ router.post('/sync-to-notion', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/n8n-orders
+ * Endpoint specifically for n8n processed order data
+ * Handles the formatted data from n8n code node
+ */
+router.post('/n8n-orders', async (req: Request, res: Response) => {
+  try {
+    console.log('📦 Received n8n processed order data');
+
+    const orderData = req.body;
+    
+    // Handle both single order and array format
+    const orders = Array.isArray(orderData) ? orderData : [orderData];
+    
+    if (orders.length === 0) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'No order data provided'
+      });
+    }
+
+    const results = [];
+    
+    for (const order of orders) {
+      // Validate required fields from n8n format
+      if (!order.orderId || !order.shopDomain) {
+        console.error('❌ Invalid order data - missing required fields:', order);
+        results.push({
+          orderId: order.orderId || 'unknown',
+          success: false,
+          error: 'Missing required fields: orderId or shopDomain'
+        });
+        continue;
+      }
+
+      console.log(`📝 Processing order #${order.orderNumber} (ID: ${order.orderId})`);
+      console.log(`👤 Customer: ${order.customerName}`);
+      console.log(`💰 Total: ${order.currency} ${order.totalPrice}`);
+
+      // Extract shop name from domain
+      const shopName = order.shopDomain.replace('.myshopify.com', '');
+      console.log(`🏪 Processing order for shop: ${shopName}`);
+
+      // Find all users who have this store connected
+      const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+      
+      if (usersWithStore.length === 0) {
+        console.warn(`⚠️ No users found with store ${shopName} connected`);
+        results.push({
+          orderId: order.orderId,
+          orderNumber: order.orderNumber,
+          success: false,
+          error: 'No users found with this store connected'
+        });
+        continue;
+      }
+
+      // Convert n8n format to Shopify format for Notion service
+      const shopifyFormatOrder = {
+        id: parseInt(order.orderId),
+        order_number: order.orderNumber,
+        name: order.orderName,
+        email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined,
+        created_at: order.createdAt,
+        updated_at: order.updatedAt,
+        cancelled_at: null,
+        closed_at: null,
+        processed_at: order.createdAt,
+        customer: {
+          first_name: order.hasCustomer ? order.customerName.split(' ')[0] : 'Manual Order',
+          last_name: order.hasCustomer ? order.customerName.split(' ').slice(1).join(' ') : 'No Customer',
+          email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined
+        },
+        billing_address: null,
+        shipping_address: order.shippingAddress !== 'No Address' ? { 
+          address1: order.shippingAddress 
+        } : null,
+        currency: order.currency,
+        total_price: order.totalPrice.toString(),
+        subtotal_price: order.subtotalPrice.toString(),
+        total_tax: order.totalTax.toString(),
+        line_items: [{
+          title: order.lineItems,
+          quantity: 1,
+          price: order.totalPrice.toString()
+        }],
+        fulfillment_status: order.orderStatus.toLowerCase(),
+        financial_status: order.paymentStatus,
+        tags: order.tags,
+        note: order.note,
+        gateway: 'shopify',
+        test: order.isTest,
+        order_status_url: order.shopifyAdminLink
+      };
+
+      // Sync to all users' Notion databases
+      const syncResults = [];
+      for (const { user, store } of usersWithStore) {
+        try {
+          console.log(`📊 Syncing to user ${user.email} (${user.id})`);
+          
+          // Create Notion service for this user
+          const userNotionService = new NotionService(user.notionToken, user.notionDbId);
+          
+          // Create the page in user's Notion database
+          const notionPageId = await userNotionService.createOrderPage(shopifyFormatOrder as any);
+          
+          syncResults.push({
+            userId: user.id,
+            userEmail: user.email,
+            notionPageId: notionPageId,
+            success: true
+          });
+          
+          console.log(`✅ Synced to ${user.email}'s Notion database`);
+          
+        } catch (userError) {
+          console.error(`❌ Failed to sync to user ${user.email}:`, userError);
+          syncResults.push({
+            userId: user.id,
+            userEmail: user.email,
+            success: false,
+            error: userError instanceof Error ? userError.message : String(userError)
+          });
+        }
+      }
+
+      const successfulSyncs = syncResults.filter(r => r.success).length;
+      console.log(`🎉 Successfully synced order #${order.orderNumber} to ${successfulSyncs}/${syncResults.length} users`);
+
+      results.push({
+        orderId: order.orderId,
+        orderNumber: order.orderNumber,
+        shopName: shopName,
+        syncedToUsers: successfulSyncs,
+        totalUsers: syncResults.length,
+        syncResults: syncResults,
+        success: successfulSyncs > 0
+      });
+    }
+
+    const totalSuccessful = results.filter(r => r.success).length;
+    
+    // Send success response
+    res.status(200).json({
+      success: totalSuccessful > 0,
+      message: `Successfully processed ${totalSuccessful}/${results.length} orders`,
+      data: {
+        processedOrders: results.length,
+        successfulSyncs: totalSuccessful,
+        results: results
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error processing n8n webhook:', error);
+    
+    // Send error response
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to process n8n webhook',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 

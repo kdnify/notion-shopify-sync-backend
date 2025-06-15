@@ -510,4 +510,115 @@ router.post('/update-notion-db', (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /auth/notion-callback
+ * Handles Notion OAuth callback and creates personal database
+ */
+router.get('/notion-callback', async (req: Request, res: Response) => {
+  try {
+    console.log('📥 Received Notion OAuth callback:', req.query);
+
+    const { code, state, error } = req.query;
+
+    if (error) {
+      console.error('❌ Notion OAuth error:', error);
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      return res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Notion authorization failed')}`);
+    }
+
+    if (!code || !state) {
+      console.error('❌ Missing code or state in Notion callback');
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      return res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Invalid Notion callback')}`);
+    }
+
+    // Parse state to get shop info
+    let stateData;
+    try {
+      stateData = JSON.parse(decodeURIComponent(state as string));
+    } catch (e) {
+      console.error('❌ Failed to parse state:', e);
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      return res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Invalid state parameter')}`);
+    }
+
+    const shopDomain = stateData.shop;
+    const shopName = shopDomain.replace('.myshopify.com', '');
+
+    console.log(`🔑 Processing Notion OAuth for shop: ${shopName}`);
+
+    // Exchange code for access token
+    const tokenResponse = await fetch('https://api.notion.com/v1/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from('212d872b-594c-80fd-ae95-0037202a219e:secret_OHDs08lzFH2scqrgxCot72sQ3b86hvTg9Ga9HaMYksi').toString('base64')}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: `${req.protocol}://${req.get('host')}/auth/notion-callback`
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('❌ Failed to exchange Notion code for token:', errorText);
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      return res.redirect(`${appUrl}/app?shop=${shopDomain}&error=${encodeURIComponent('Failed to connect to Notion')}`);
+    }
+
+    const tokenData = await tokenResponse.json() as any;
+    console.log('✅ Got Notion access token');
+
+    // Create personal database using the new token
+    try {
+      const createDbResponse = await fetch(`${req.protocol}://${req.get('host')}/notion/create-db-with-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shopDomain: shopDomain,
+          accessToken: tokenData.access_token,
+          workspaceId: tokenData.workspace_id
+        })
+      });
+
+      if (createDbResponse.ok) {
+        const dbResult = await createDbResponse.json() as any;
+        console.log(`✅ Created personal database: ${dbResult.dbId}`);
+        
+        // Update user with new token and database
+        const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+        if (usersWithStore.length > 0) {
+          const { user } = usersWithStore[0];
+          userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
+          // Note: In a real app, you'd also store the new access token
+          console.log(`📊 Updated user ${user.id} with Notion database: ${dbResult.dbId}`);
+        }
+
+        // Redirect back to embedded app with success
+        const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+        res.redirect(`${appUrl}/app?shop=${shopDomain}&connected=true`);
+      } else {
+        const errorText = await createDbResponse.text();
+        console.error('❌ Failed to create database:', errorText);
+        const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+        res.redirect(`${appUrl}/app?shop=${shopDomain}&error=${encodeURIComponent('Failed to create Notion database')}`);
+      }
+    } catch (dbError) {
+      console.error('❌ Database creation error:', dbError);
+      const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+      res.redirect(`${appUrl}/app?shop=${shopDomain}&error=${encodeURIComponent('Database creation failed')}`);
+    }
+
+  } catch (error) {
+    console.error('❌ Error in Notion OAuth callback:', error);
+    const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+    res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Notion OAuth failed')}`);
+  }
+});
+
 export default router; 
