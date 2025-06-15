@@ -933,4 +933,34 @@ router.post('/debug-n8n', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/debug-n8n-data
+ * Simple debug endpoint to see exactly what n8n is sending
+ */
+router.post('/debug-n8n-data', async (req: Request, res: Response) => {
+  try {
+    console.log('🔍 DEBUG: Raw request body:', req.body);
+    console.log('🔍 DEBUG: Request headers:', req.headers);
+    console.log('🔍 DEBUG: Body type:', typeof req.body);
+    console.log('🔍 DEBUG: Body stringified:', JSON.stringify(req.body, null, 2));
+    
+    res.json({
+      success: true,
+      message: 'Debug data received',
+      data: {
+        receivedBody: req.body,
+        bodyType: typeof req.body,
+        headers: req.headers,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error);
+    res.status(500).json({
+      error: 'Debug endpoint error',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 
