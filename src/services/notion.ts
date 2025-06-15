@@ -82,10 +82,18 @@ export class NotionService {
             ],
           },
           
-          // Customer Email
-          'Email': {
-            email: order.customer.email,
-          },
+          // Customer Email - handle different property types
+          ...(order.customer.email ? {
+            'Email': {
+              rich_text: [
+                {
+                  text: {
+                    content: order.customer.email,
+                  },
+                },
+              ],
+            },
+          } : {}),
           
           // Total Price
           'Total': {
