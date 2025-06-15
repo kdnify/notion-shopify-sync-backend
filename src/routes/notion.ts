@@ -5,7 +5,7 @@ import { userStoreService } from '../services/userStore';
 const router = express.Router();
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_TEMPLATE_DB_ID = process.env.NOTION_TEMPLATE_DB_ID || '212e8f5ac14a807fb67ac1887df275d5';
+const NOTION_TEMPLATE_DB_ID = process.env.NOTION_TEMPLATE_DB_ID;
 
 if (!NOTION_TOKEN) {
   console.error('❌ NOTION_TOKEN environment variable is required');
