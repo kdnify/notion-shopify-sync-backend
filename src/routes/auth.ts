@@ -137,6 +137,37 @@ router.get('/callback', async (req: Request, res: Response) => {
     // Add store to user
     userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
 
+    // 🆕 AUTO-CREATE PERSONAL NOTION DATABASE
+    try {
+      console.log(`🏗️ Creating personal Notion database for ${shopName}...`);
+      
+      // Call our new database creation endpoint internally
+      const createDbResponse = await fetch(`${req.protocol}://${req.get('host')}/notion/create-db`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shopDomain: shopInfo.domain,
+          email: email
+        })
+      });
+
+      if (createDbResponse.ok) {
+        const dbResult = await createDbResponse.json() as { success: boolean; dbId: string; message: string };
+        console.log(`✅ Created personal database: ${dbResult.dbId}`);
+        
+        // Update user with the new personal database ID
+        userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
+        console.log(`📊 Updated user ${user.id} with personal database: ${dbResult.dbId}`);
+      } else {
+        console.warn(`⚠️ Failed to create personal database for ${shopName}, using default`);
+      }
+    } catch (dbError) {
+      console.warn(`⚠️ Database creation failed for ${shopName}:`, dbError instanceof Error ? dbError.message : dbError);
+      // Continue with default database - don't break the installation
+    }
+
     // Create order webhook (non-blocking)
     try {
       const webhook = await shopifyService.createOrderWebhook(shopName, accessToken);

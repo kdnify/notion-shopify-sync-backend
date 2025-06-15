@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import webhookRoutes from './routes/webhooks';
 import authRoutes from './routes/auth';
+import notionRoutes from './routes/notion';
 
 // Load environment variables
 dotenv.config();
@@ -39,6 +40,7 @@ app.use('/static', express.static(path.join(__dirname, '../public')));
 // Routes
 app.use('/auth', authRoutes);
 app.use('/webhooks', webhookRoutes);
+app.use('/notion', notionRoutes);
 
 // Embedded app main interface
 app.get('/app', (req: express.Request, res: express.Response) => {
@@ -208,7 +210,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             </button>
             <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
               Opens our Notion template in a new tab. Duplicate it to your workspace.<br/>
-              <a href="https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5" target="_blank" style="color: #0066cc; text-decoration: underline;">
+              <a href="https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b&source=copy_link" target="_blank" style="color: #0066cc; text-decoration: underline;">
                 Or click here if the button doesn't work
               </a>
             </p>
@@ -320,38 +322,8 @@ app.get('/app', (req: express.Request, res: express.Response) => {
         }
 
         function openNotionTemplate() {
-          // Try multiple methods to open the Notion template
-          const notionUrl = 'https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5';
-          
-          try {
-            // Method 1: Use Shopify App Bridge Redirect action
-            const redirect = Redirect.create(app);
-            redirect.dispatch(Redirect.Action.REMOTE, {
-              url: notionUrl,
-              newContext: true
-            });
-            
-            const toast = Toast.create(app, {
-              message: '📋 Opening Notion template...',
-              duration: 3000
-            });
-            toast.dispatch(Toast.Action.SHOW);
-          } catch (error) {
-            // Method 2: Fallback to window.open
-            console.log('App Bridge redirect failed, trying window.open:', error);
-            const newWindow = window.open(notionUrl, '_blank', 'noopener,noreferrer');
-            
-            if (newWindow) {
-              const toast = Toast.create(app, {
-                message: '📋 Notion template opened in new tab',
-                duration: 3000
-              });
-              toast.dispatch(Toast.Action.SHOW);
-            } else {
-              // Method 3: Fallback to direct navigation
-              window.location.href = notionUrl;
-            }
-          }
+          const notionUrl = 'https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b&source=copy_link';
+          window.open(notionUrl, '_blank');
         }
 
         async function updateNotionDb() {
