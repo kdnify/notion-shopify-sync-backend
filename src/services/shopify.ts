@@ -86,14 +86,13 @@ export class ShopifyService {
    */
   async createOrderWebhook(shop: string, accessToken: string): Promise<WebhookCreationResponse> {
     try {
-      if (!this.appUrl) {
-        throw new Error('SHOPIFY_APP_URL environment variable is required for webhook creation');
-      }
+      // Use n8n webhook endpoint instead of backend webhook
+      const webhookUrl = process.env.N8N_WEBHOOK_URL || 'https://khaydien.app.n8n.cloud/webhook-test/shopify-order-webhook';
 
       const webhookData = {
         webhook: {
           topic: 'orders/create',
-          address: `${this.appUrl}/webhooks/orders`,
+          address: webhookUrl,
           format: 'json',
         },
       };
@@ -113,7 +112,8 @@ export class ShopifyService {
       }
 
       const result = await response.json() as WebhookCreationResponse;
-      console.log(`✅ Created webhook for ${shop}:`, result.webhook.id);
+      console.log(`✅ Created webhook for ${shop} → n8n:`, result.webhook.id);
+      console.log(`🎯 Webhook URL: ${webhookUrl}`);
       
       return result;
     } catch (error) {
