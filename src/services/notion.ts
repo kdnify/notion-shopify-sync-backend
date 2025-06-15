@@ -353,4 +353,35 @@ export class NotionService {
       return false;
     }
   }
+
+  /**
+   * Get the database schema for debugging
+   * @returns Promise<any> - The database schema
+   */
+  async getDatabaseSchema(): Promise<any> {
+    try {
+      const database = await this.notion.databases.retrieve({
+        database_id: this.databaseId,
+      });
+
+      // Return a simplified version of the schema
+      const schema = {
+        databaseId: this.databaseId,
+        properties: {}
+      };
+
+      // Extract property information
+      Object.entries(database.properties as any).forEach(([propName, propConfig]: [string, any]) => {
+        (schema.properties as any)[propName] = {
+          type: propConfig.type,
+          name: propName
+        };
+      });
+
+      return schema;
+    } catch (error) {
+      console.error('❌ Failed to get database schema:', error);
+      throw error;
+    }
+  }
 } 

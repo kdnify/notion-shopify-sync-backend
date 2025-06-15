@@ -992,4 +992,33 @@ router.post('/debug-n8n-data', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /webhooks/debug-notion-schema
+ * Debug endpoint to see the actual Notion database schema
+ */
+router.get('/debug-notion-schema', async (req: Request, res: Response) => {
+  try {
+    if (!notionService) {
+      return res.status(500).json({
+        error: 'Notion service not initialized'
+      });
+    }
+
+    // Get the database schema
+    const schema = await notionService.getDatabaseSchema();
+    
+    res.json({
+      success: true,
+      message: 'Database schema retrieved',
+      data: schema
+    });
+  } catch (error) {
+    console.error('❌ Debug schema endpoint error:', error);
+    res.status(500).json({
+      error: 'Debug schema endpoint error',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 
