@@ -173,7 +173,7 @@ router.get('/app', async (req: Request, res: Response) => {
         function openUserDatabase() {
           if (currentNotionDbId) {
             const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
-            window.open(notionUrl, '_blank');
+            window.open(notionUrl, '_blank', 'noopener,noreferrer');
           } else {
             alert('No personal database found. Please set up Notion integration.');
           }
