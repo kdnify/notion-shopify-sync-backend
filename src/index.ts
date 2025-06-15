@@ -344,7 +344,13 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             // Construct proper Notion database URL
             const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
             console.log('Opening Notion database:', notionUrl);
-            window.open(notionUrl, '_blank', 'noopener,noreferrer');
+            
+            // Use Shopify App Bridge to redirect to external URL
+            const redirect = Redirect.create(app);
+            redirect.dispatch(Redirect.Action.REMOTE, {
+              url: notionUrl,
+              newContext: true
+            });
           } else {
             console.log('No database ID available');
             const toast = Toast.create(app, {
