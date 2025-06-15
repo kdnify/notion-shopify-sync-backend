@@ -341,7 +341,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             '&state=' + state;
 
           // Redirect to Notion OAuth
-          window.location.href = notionOAuthUrl;
+          window.open(notionOAuthUrl, '_blank');
         }
 
         function openUserDatabase() {
