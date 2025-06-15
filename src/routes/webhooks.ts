@@ -105,7 +105,7 @@ router.post('/orders', async (req: Request, res: Response) => {
     console.log(`🏪 Processing order for shop: ${shopName}`);
 
     // Find all users who have this store connected
-    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
     
     if (usersWithStore.length === 0) {
       console.warn(`⚠️ No users found with store ${shopName} connected`);
@@ -254,7 +254,7 @@ router.post('/sync-to-notion', async (req: Request, res: Response) => {
     const shopName = shopDomain.replace('.myshopify.com', '');
 
     // Find users with this store
-    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
     
     if (usersWithStore.length === 0) {
       console.warn(`⚠️ No users found for shop: ${shopName}`);
@@ -362,7 +362,7 @@ router.post('/n8n-orders', async (req: Request, res: Response) => {
       console.log(`🏪 Processing order for shop: ${shopName}`);
 
       // Find all users who have this store connected
-      const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+      const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
       
       if (usersWithStore.length === 0) {
         console.warn(`⚠️ No users found with store ${shopName} connected`);

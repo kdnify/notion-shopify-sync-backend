@@ -248,12 +248,12 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
     // Get user's stores
     const usersWithStore = await userStoreService.getAllUsersWithStore(user.id);
-    const stores = usersWithStore.map(({ store }) => ({
+    const stores = await Promise.all(usersWithStore.map(async ({ store }) => ({
       shopName: store.shopName,
       shopDomain: store.shopDomain,
       connectedAt: store.connectedAt,
       isActive: store.isActive
-    }));
+    })));
 
     res.json({
       success: true,
@@ -373,7 +373,7 @@ router.get('/webhooks-debug', async (req: Request, res: Response) => {
     const shopName = shop.replace('.myshopify.com', '');
     
     // Get user and store info to get access token
-    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
     
     if (usersWithStore.length === 0) {
       return res.status(404).json({
@@ -382,7 +382,7 @@ router.get('/webhooks-debug', async (req: Request, res: Response) => {
       });
     }
 
-    const { store } = usersWithStore[0]; // Use first user's store
+    const { store } = await usersWithStore[0]; // Use first user's store
     
     // List existing webhooks
     const webhooks = await shopifyService.listWebhooks(shopName, store.accessToken);
@@ -439,7 +439,7 @@ router.get('/user-info', async (req: Request, res: Response) => {
     }
 
     // Return info for the first user (could be enhanced to handle multiple users)
-    const { user } = usersWithStore[0];
+    const { user } = await usersWithStore[0];
     
     res.json({
       success: true,
@@ -619,10 +619,10 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         console.log(`✅ Created personal database: ${dbResult.dbId}`);
         
         // Update user with new token and database
-        const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+        const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
         if (usersWithStore.length > 0) {
-          const { user } = usersWithStore[0];
-          userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
+          const { user } = await usersWithStore[0];
+          await userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
           // Note: In a real app, you'd also store the new access token
           console.log(`📊 Updated user ${user.id} with personal Notion database: ${dbResult.dbId}`);
           console.log(`🎯 Database URL: https://www.notion.so/${dbResult.dbId.replace(/-/g, '')}`);
@@ -729,7 +729,7 @@ router.post('/connect-store', async (req: Request, res: Response) => {
 
     // Check if store is already connected
     const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
-    const storeExists = usersWithStore.some(({ user: u }) => u.id === user.id);
+    const storeExists = await Promise.all(usersWithStore.map(async ({ user: u }) => u.id === user.id));
 
     if (!storeExists) {
       await userStoreService.addStoreToUser(

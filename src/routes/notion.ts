@@ -151,9 +151,9 @@ router.post('/create-db', async (req, res) => {
 
     // If we have user info, update their record
     if (email) {
-      const user = userStoreService.getUserByEmail(email);
+      const user = await userStoreService.getUserByEmail(email);
       if (user) {
-        userStoreService.updateUserNotionDb(user.id, newDbId);
+        await userStoreService.updateUserNotionDb(user.id, newDbId);
         console.log(`📊 Updated user ${email} with new database ID: ${newDbId}`);
       }
     }
