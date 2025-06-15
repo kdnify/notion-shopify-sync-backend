@@ -568,7 +568,7 @@ router.post('/n8n-simple', async (req: Request, res: Response) => {
             last_name: order.customerName && order.customerName !== 'Manual Order - No Customer'
               ? order.customerName.split(' ').slice(1).join(' ') || 'Customer'
               : 'No Customer',
-            email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined,
+            email: order.customerEmail || undefined,
             phone: order.customerPhone !== 'No Phone' ? order.customerPhone : null
           },
           billing_address: null,

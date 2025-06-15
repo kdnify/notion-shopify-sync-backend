@@ -102,11 +102,29 @@ export class NotionService {
             break;
             
           case 'Customer Email':
-            if (order.customer?.email && order.customer.email !== 'no-email@manual-order.com') {
+            console.log(`🔍 Customer Email debug:`, {
+              hasCustomer: !!order.customer,
+              customerEmail: order.customer?.email,
+              emailType: typeof order.customer?.email
+            });
+            
+            if (order.customer?.email) {
+              // For testing purposes, allow placeholder emails but mark them
+              let emailToSet = order.customer.email;
+              
+              // Only skip truly invalid emails
+              if (order.customer.email === 'no-email@manual-order.com') {
+                console.log(`⚠️ Skipping placeholder email: ${order.customer.email}`);
+                // Skip this field for placeholder emails
+                break;
+              }
+              
               properties[propName] = {
-                email: order.customer.email,
+                email: emailToSet,
               };
-              console.log(`📝 Setting "${propName}" to: ${order.customer.email}`);
+              console.log(`📝 Setting "${propName}" to: ${emailToSet}`);
+            } else {
+              console.log(`⚠️ No customer email found or email is undefined`);
             }
             break;
             
