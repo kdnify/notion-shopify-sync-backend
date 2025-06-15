@@ -197,6 +197,34 @@ export class NotionService {
             }
             break;
             
+          case 'status':
+            if (propNameLower.includes('status')) {
+              // Handle Notion's status field type (different from select)
+              let statusValue = 'unfulfilled'; // Default to unfulfilled
+              if (order.fulfillment_status) {
+                statusValue = order.fulfillment_status.toLowerCase();
+              } else if (order.financial_status) {
+                statusValue = order.financial_status.toLowerCase();
+              }
+              
+              properties[propName] = {
+                status: {
+                  name: statusValue,
+                },
+              };
+              console.log(`📝 Setting status field "${propName}" to: ${statusValue} (fulfillment: ${order.fulfillment_status}, financial: ${order.financial_status})`);
+            }
+            break;
+            
+          case 'email':
+            if (propNameLower.includes('email') && order.customer?.email) {
+              properties[propName] = {
+                email: order.customer.email,
+              };
+              console.log(`📝 Setting email field "${propName}" to: ${order.customer.email}`);
+            }
+            break;
+            
           case 'url':
             if ((propNameLower.includes('shopify') || propNameLower.includes('link')) && order.order_status_url) {
               properties[propName] = {
