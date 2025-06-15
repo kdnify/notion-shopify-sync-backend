@@ -206,7 +206,12 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             <button class="sync-button" onclick="openNotionTemplate()" style="background: #0066cc;">
               📋 Copy the Notion Order Tracker
             </button>
-            <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">Opens our Notion template in a new tab. Duplicate it to your workspace.</p>
+            <p style="font-size: 12px; color: #6d7175; margin: 8px 0;">
+              Opens our Notion template in a new tab. Duplicate it to your workspace.<br/>
+              <a href="https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5" target="_blank" style="color: #0066cc; text-decoration: underline;">
+                Or click here if the button doesn't work
+              </a>
+            </p>
           </div>
 
           <div style="margin-bottom: 20px;">
@@ -315,13 +320,38 @@ app.get('/app', (req: express.Request, res: express.Response) => {
         }
 
         function openNotionTemplate() {
-          window.open('https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5', '_blank');
+          // Try multiple methods to open the Notion template
+          const notionUrl = 'https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5';
           
-          const toast = Toast.create(app, {
-            message: '📋 Notion template opened in new tab',
-            duration: 3000
-          });
-          toast.dispatch(Toast.Action.SHOW);
+          try {
+            // Method 1: Use Shopify App Bridge Redirect action
+            const redirect = Redirect.create(app);
+            redirect.dispatch(Redirect.Action.REMOTE, {
+              url: notionUrl,
+              newContext: true
+            });
+            
+            const toast = Toast.create(app, {
+              message: '📋 Opening Notion template...',
+              duration: 3000
+            });
+            toast.dispatch(Toast.Action.SHOW);
+          } catch (error) {
+            // Method 2: Fallback to window.open
+            console.log('App Bridge redirect failed, trying window.open:', error);
+            const newWindow = window.open(notionUrl, '_blank', 'noopener,noreferrer');
+            
+            if (newWindow) {
+              const toast = Toast.create(app, {
+                message: '📋 Notion template opened in new tab',
+                duration: 3000
+              });
+              toast.dispatch(Toast.Action.SHOW);
+            } else {
+              // Method 3: Fallback to direct navigation
+              window.location.href = notionUrl;
+            }
+          }
         }
 
         async function updateNotionDb() {
