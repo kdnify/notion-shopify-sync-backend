@@ -47,12 +47,13 @@ async function duplicateDatabase(templateDbId: string, userShopName: string): Pr
       }
     });
 
-    // Create a new database with the same structure
+    // We need a page ID as parent, not a database ID
+    // For now, we'll use the workspace as parent since we don't have a specific page
     const newDb = await notion.databases.create({
       parent: {
-        type: 'page_id',
-        page_id: process.env.NOTION_PARENT_PAGE_ID || templateDbId, // Fallback to template if no parent specified
-      },
+        type: 'workspace',
+        workspace: true
+      } as any,
       title: [
         {
           text: {
