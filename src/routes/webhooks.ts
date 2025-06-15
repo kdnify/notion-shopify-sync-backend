@@ -732,4 +732,98 @@ router.post('/test-create', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /webhooks/inspect-db
+ * Inspect the database structure and recent pages
+ */
+router.get('/inspect-db', async (req: Request, res: Response) => {
+  try {
+    console.log('🔍 Database inspection endpoint called');
+
+    if (!notionService) {
+      return res.status(500).json({
+        error: 'Notion service not initialized'
+      });
+    }
+
+    const dbId = process.env.NOTION_DB_ID;
+    console.log(`🔍 Inspecting database: ${dbId}`);
+
+    // Get database info
+    const database = await notionService['notion'].databases.retrieve({
+      database_id: dbId!,
+    });
+
+    // Get recent pages from the database
+    const pages = await notionService['notion'].databases.query({
+      database_id: dbId!,
+      sorts: [
+        {
+          timestamp: 'created_time',
+          direction: 'descending'
+        }
+      ],
+      page_size: 10
+    });
+
+    // Extract database title
+    let dbTitle = 'Unknown Database';
+    if (database && 'title' in database && Array.isArray(database.title) && database.title.length > 0) {
+      dbTitle = database.title[0].plain_text || 'Unknown Database';
+    }
+
+    // Extract property info
+    const properties = Object.entries(database.properties as any).map(([name, prop]: [string, any]) => ({
+      name,
+      type: prop.type,
+      id: prop.id
+    }));
+
+    // Extract page info
+    const pageInfo = pages.results.map((page: any) => {
+      const props: any = {};
+      Object.entries(page.properties).forEach(([key, value]: [string, any]) => {
+        if (value.type === 'title' && value.title.length > 0) {
+          props[key] = value.title[0].plain_text;
+        } else if (value.type === 'rich_text' && value.rich_text.length > 0) {
+          props[key] = value.rich_text[0].plain_text;
+        } else if (value.type === 'number') {
+          props[key] = value.number;
+        } else if (value.type === 'select' && value.select) {
+          props[key] = value.select.name;
+        } else if (value.type === 'date' && value.date) {
+          props[key] = value.date.start;
+        }
+      });
+      
+      return {
+        id: page.id,
+        created_time: page.created_time,
+        last_edited_time: page.last_edited_time,
+        properties: props
+      };
+    });
+
+    res.json({
+      success: true,
+      database: {
+        id: dbId,
+        title: dbTitle,
+        properties: properties,
+        totalPages: pages.results.length,
+        recentPages: pageInfo
+      },
+      message: 'Database inspection completed'
+    });
+
+  } catch (error) {
+    console.error('❌ Error inspecting database:', error);
+    res.status(500).json({
+      error: 'Failed to inspect database',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+  }
+});
+
 export default router; 
