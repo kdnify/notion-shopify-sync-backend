@@ -293,12 +293,55 @@ router.post('/create-db-with-token', async (req, res) => {
       database_id: NOTION_TEMPLATE_DB_ID,
     });
 
+    // Find a suitable parent page in user's workspace
+    // First, try to find the user's workspace pages
+    const searchResponse = await userNotion.search({
+      filter: {
+        value: 'page',
+        property: 'object'
+      },
+      page_size: 10
+    });
+
+    let parentPageId = null;
+    
+    // Look for a suitable parent page (preferably one the user owns)
+    for (const result of searchResponse.results) {
+      if (result.object === 'page' && 'parent' in result) {
+        // Use the first page we find as parent
+        parentPageId = result.id;
+        break;
+      }
+    }
+
+    // If no suitable page found, create one in the workspace
+    if (!parentPageId) {
+      const newPage = await userNotion.pages.create({
+        parent: {
+          type: 'workspace',
+          workspace: true
+        } as any,
+        properties: {
+          title: {
+            title: [
+              {
+                text: {
+                  content: `NotionSync - ${shopName}`
+                }
+              }
+            ]
+          }
+        }
+      });
+      parentPageId = newPage.id;
+      console.log(`📄 Created parent page: ${parentPageId}`);
+    }
+
     // Create a new database in user's workspace
-    // Note: Creating in workspace requires a page parent, so we'll use the template approach
     const newDb = await userNotion.databases.create({
       parent: {
         type: 'page_id',
-        page_id: NOTION_TEMPLATE_DB_ID, // This should be a page ID, not database ID
+        page_id: parentPageId,
       } as any,
       title: [
         {

@@ -580,7 +580,7 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
       body: JSON.stringify({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: `${req.protocol}://${req.get('host')}/auth/notion-callback`
+        redirect_uri: `https://${req.get('host')}/auth/notion-callback`
       })
     });
 
@@ -618,7 +618,10 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
           const { user } = usersWithStore[0];
           userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
           // Note: In a real app, you'd also store the new access token
-          console.log(`📊 Updated user ${user.id} with Notion database: ${dbResult.dbId}`);
+          console.log(`📊 Updated user ${user.id} with personal Notion database: ${dbResult.dbId}`);
+          console.log(`🎯 Database URL: https://www.notion.so/${dbResult.dbId.replace(/-/g, '')}`);
+        } else {
+          console.error(`❌ No user found for shop: ${shopName}`);
         }
 
         // Redirect back to embedded app with success
