@@ -225,6 +225,83 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             </div>
           </div>
 
+          <!-- Notion Connected - Choose Database -->
+          <div id="databaseChoice" style="display: none;">
+            <div class="status-card" style="background: #f0fff4; border-color: #b3ffcc;">
+              <h3 class="status-title" style="color: #00cc44;">✅ Notion Connected!</h3>
+              <p style="margin: 8px 0; color: #202223;">Choose how you want to set up your order tracking:</p>
+            </div>
+            
+            <div style="margin-top: 20px;">
+              <div class="choice-option" style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 16px; margin-bottom: 16px; cursor: pointer;" onclick="showCreateOption()">
+                <h4 style="margin: 0 0 8px 0; color: #202223;">🚀 Create New Database (Recommended)</h4>
+                <p style="margin: 0; color: #6c757d; font-size: 14px;">We'll create a beautiful order tracking database with all the right fields</p>
+              </div>
+              
+              <div class="choice-option" style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 16px; cursor: pointer;" onclick="showConnectOption()">
+                <h4 style="margin: 0 0 8px 0; color: #202223;">🔗 Connect Existing Database</h4>
+                <p style="margin: 0; color: #6c757d; font-size: 14px;">Use a database you've already created</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Create Database Option -->
+          <div id="createDatabaseOption" style="display: none;">
+            <div class="status-card" style="background: #f8f9ff; border-color: #c7d2fe;">
+              <h3 class="status-title" style="color: #4c51bf;">🚀 Create Your Database</h3>
+              <p style="margin: 8px 0; color: #202223;">We'll create a custom database with these fields:</p>
+              
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; font-size: 14px; color: #6c757d;">
+                <div>• Order Number</div>
+                <div>• Customer Name</div>
+                <div>• Customer Email</div>
+                <div>• Total Price</div>
+                <div>• Order Status</div>
+                <div>• Shipping Address</div>
+                <div>• Items Purchased</div>
+                <div>• Shopify Link</div>
+              </div>
+              
+              <div style="margin-top: 16px;">
+                <button class="sync-button" style="background: #00cc44;" id="createDbBtn">
+                  ✨ Create My Database
+                </button>
+                <button class="sync-button" style="background: #6c757d; margin-left: 8px;" onclick="showDatabaseChoice()">
+                  ← Back
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connect Existing Database Option -->
+          <div id="connectDatabaseOption" style="display: none;">
+            <div class="status-card" style="background: #f8f9ff; border-color: #c7d2fe;">
+              <h3 class="status-title" style="color: #4c51bf;">🔗 Connect Your Database</h3>
+              <p style="margin: 8px 0; color: #202223;">Paste your Notion database URL below:</p>
+              
+              <div style="margin: 16px 0;">
+                <input 
+                  type="text" 
+                  id="databaseUrl" 
+                  placeholder="https://www.notion.so/your-database-id"
+                  style="width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 6px; font-size: 14px;"
+                />
+                <div style="margin-top: 8px; font-size: 12px; color: #6c757d;">
+                  💡 Copy the URL from your Notion database page
+                </div>
+              </div>
+              
+              <div style="margin-top: 16px;">
+                <button class="sync-button" style="background: #0066cc;" id="connectDbBtn">
+                  🔗 Connect Database
+                </button>
+                <button class="sync-button" style="background: #6c757d; margin-left: 8px;" onclick="showDatabaseChoice()">
+                  ← Back
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div id="setupStatus" style="display: none; padding: 12px; border-radius: 6px; margin-top: 16px;"></div>
         </div>
 
@@ -248,74 +325,87 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
         // Initialize app - check for existing database
         async function initializeApp() {
+          // Check if user just completed Notion OAuth
+          const urlParams = new URLSearchParams(window.location.search);
+          const notionAuth = urlParams.get('notion_auth');
+          
           try {
             const response = await fetch('/auth/user-info?shop=${shop}');
             if (response.ok) {
               const userInfo = await response.json();
               console.log('User info loaded:', userInfo);
+              
               if (userInfo.success && userInfo.data.notionDbId && userInfo.data.notionDbId.trim() !== '') {
+                // User has database connected
                 currentNotionDbId = userInfo.data.notionDbId;
                 showDatabaseConnected(userInfo.data.notionDbId);
                 console.log('Database connected:', userInfo.data.notionDbId);
+              } else if (notionAuth === 'completed') {
+                // User just completed Notion OAuth but no database yet
+                console.log('Notion OAuth completed, showing database choice');
+                showDatabaseChoice();
               } else {
+                // User needs to connect to Notion
                 console.log('No database found, showing connect option');
                 showDatabaseNotConnected();
-                
-                // Check if this is from setup flow and auto-trigger Notion connection
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('setup') === 'true') {
-                  console.log('Setup flow detected, auto-triggering Notion connection');
-                  setTimeout(() => {
-                    connectToNotion();
-                  }, 1000); // Small delay to let UI render
-                }
               }
             } else {
-              console.log('Failed to load user info, showing connect option');
-              showDatabaseNotConnected();
-              
-              // Check if this is from setup flow and auto-trigger Notion connection
-              const urlParams = new URLSearchParams(window.location.search);
-              if (urlParams.get('setup') === 'true') {
-                console.log('Setup flow detected, auto-triggering Notion connection');
-                setTimeout(() => {
-                  connectToNotion();
-                }, 1000); // Small delay to let UI render
+              // User doesn't exist or other error
+              if (notionAuth === 'completed') {
+                console.log('Notion OAuth completed but user info failed, showing database choice');
+                showDatabaseChoice();
+              } else {
+                console.log('Failed to load user info, showing connect option');
+                showDatabaseNotConnected();
               }
             }
           } catch (error) {
             console.log('Could not load user info:', error);
-            showDatabaseNotConnected();
-            
-            // Check if this is from setup flow and auto-trigger Notion connection
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('setup') === 'true') {
-              console.log('Setup flow detected, auto-triggering Notion connection');
-              setTimeout(() => {
-                connectToNotion();
-              }, 1000); // Small delay to let UI render
+            if (notionAuth === 'completed') {
+              console.log('Notion OAuth completed but error loading user, showing database choice');
+              showDatabaseChoice();
+            } else {
+              showDatabaseNotConnected();
             }
           }
         }
 
         function showDatabaseConnected(dbId) {
+          hideAllStates();
           const connected = document.getElementById('databaseConnected');
-          const notConnected = document.getElementById('databaseNotConnected');
-          
-          if (connected && notConnected) {
-            connected.style.display = 'block';
-            notConnected.style.display = 'none';
-          }
+          if (connected) connected.style.display = 'block';
         }
 
         function showDatabaseNotConnected() {
-          const connected = document.getElementById('databaseConnected');
+          hideAllStates();
           const notConnected = document.getElementById('databaseNotConnected');
-          
-          if (connected && notConnected) {
-            connected.style.display = 'none';
-            notConnected.style.display = 'block';
-          }
+          if (notConnected) notConnected.style.display = 'block';
+        }
+
+        function showDatabaseChoice() {
+          hideAllStates();
+          const choice = document.getElementById('databaseChoice');
+          if (choice) choice.style.display = 'block';
+        }
+
+        function showCreateOption() {
+          hideAllStates();
+          const create = document.getElementById('createDatabaseOption');
+          if (create) create.style.display = 'block';
+        }
+
+        function showConnectOption() {
+          hideAllStates();
+          const connect = document.getElementById('connectDatabaseOption');
+          if (connect) connect.style.display = 'block';
+        }
+
+        function hideAllStates() {
+          const states = ['databaseConnected', 'databaseNotConnected', 'databaseChoice', 'createDatabaseOption', 'connectDatabaseOption'];
+          states.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.style.display = 'none';
+          });
         }
 
         function connectToNotion() {
@@ -370,12 +460,163 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
 
 
+        // Database creation and connection functions
+        async function createNewDatabase() {
+          const createBtn = document.getElementById('createDbBtn');
+          if (createBtn) {
+            createBtn.textContent = '⏳ Creating Database...';
+            createBtn.disabled = true;
+          }
+
+          try {
+            const response = await fetch('/notion/create-template-db', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                shopDomain: '${shop}'
+              })
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              console.log('Database created:', result);
+              
+              // Update UI to show success
+              currentNotionDbId = result.dbId;
+              showDatabaseConnected(result.dbId);
+              
+              // Show success message
+              const toast = Toast.create(app, {
+                message: '✅ Database created successfully!',
+                duration: 3000
+              });
+              toast.dispatch(Toast.Action.SHOW);
+            } else {
+              const error = await response.json();
+              console.error('Failed to create database:', error);
+              
+              const toast = Toast.create(app, {
+                message: '❌ Failed to create database: ' + error.message,
+                duration: 5000
+              });
+              toast.dispatch(Toast.Action.SHOW);
+              
+              if (createBtn) {
+                createBtn.textContent = '✨ Create My Database';
+                createBtn.disabled = false;
+              }
+            }
+          } catch (error) {
+            console.error('Error creating database:', error);
+            
+            const toast = Toast.create(app, {
+              message: '❌ Error creating database',
+              duration: 3000
+            });
+            toast.dispatch(Toast.Action.SHOW);
+            
+            if (createBtn) {
+              createBtn.textContent = '✨ Create My Database';
+              createBtn.disabled = false;
+            }
+          }
+        }
+
+        async function connectExistingDatabase() {
+          const connectBtn = document.getElementById('connectDbBtn');
+          const urlInput = document.getElementById('databaseUrl');
+          
+          if (!urlInput || !urlInput.value.trim()) {
+            const toast = Toast.create(app, {
+              message: '❌ Please enter a database URL',
+              duration: 3000
+            });
+            toast.dispatch(Toast.Action.SHOW);
+            return;
+          }
+
+          if (connectBtn) {
+            connectBtn.textContent = '⏳ Connecting...';
+            connectBtn.disabled = true;
+          }
+
+          try {
+            const response = await fetch('/auth/connect-store', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                shopName: '${shop}'.replace('.myshopify.com', ''),
+                notionDbId: urlInput.value.trim()
+              })
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              console.log('Database connected:', result);
+              
+              // Update UI to show success
+              currentNotionDbId = result.data.notionDbId;
+              showDatabaseConnected(result.data.notionDbId);
+              
+              // Show success message
+              const toast = Toast.create(app, {
+                message: '✅ Database connected successfully!',
+                duration: 3000
+              });
+              toast.dispatch(Toast.Action.SHOW);
+            } else {
+              const error = await response.json();
+              console.error('Failed to connect database:', error);
+              
+              const toast = Toast.create(app, {
+                message: '❌ Failed to connect: ' + error.message,
+                duration: 5000
+              });
+              toast.dispatch(Toast.Action.SHOW);
+              
+              if (connectBtn) {
+                connectBtn.textContent = '🔗 Connect Database';
+                connectBtn.disabled = false;
+              }
+            }
+          } catch (error) {
+            console.error('Error connecting database:', error);
+            
+            const toast = Toast.create(app, {
+              message: '❌ Error connecting database',
+              duration: 3000
+            });
+            toast.dispatch(Toast.Action.SHOW);
+            
+            if (connectBtn) {
+              connectBtn.textContent = '🔗 Connect Database';
+              connectBtn.disabled = false;
+            }
+          }
+        }
+
         // Add event listeners
         document.addEventListener('DOMContentLoaded', function() {
           // Connect button event listener
           const connectBtn = document.getElementById('connectBtn');
           if (connectBtn) {
             connectBtn.addEventListener('click', connectToNotion);
+          }
+
+          // Create database button
+          const createBtn = document.getElementById('createDbBtn');
+          if (createBtn) {
+            createBtn.addEventListener('click', createNewDatabase);
+          }
+
+          // Connect existing database button
+          const connectDbBtn = document.getElementById('connectDbBtn');
+          if (connectDbBtn) {
+            connectDbBtn.addEventListener('click', connectExistingDatabase);
           }
           
           // Open database button event listener

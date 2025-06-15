@@ -409,4 +409,128 @@ router.post('/create-db-with-token', async (req, res) => {
   }
 });
 
+/**
+ * Create a template database for a user (simplified approach)
+ * POST /notion/create-template-db
+ * Body: { shopDomain: string }
+ */
+router.post('/create-template-db', async (req, res) => {
+  try {
+    const { shopDomain } = req.body;
+
+    if (!shopDomain) {
+      return res.status(400).json({ 
+        error: 'Missing required field: shopDomain' 
+      });
+    }
+
+    if (!NOTION_TOKEN) {
+      return res.status(500).json({ 
+        error: 'Server configuration error: Missing Notion token' 
+      });
+    }
+
+    // Extract shop name from domain
+    const shopName = shopDomain.replace('.myshopify.com', '');
+
+    console.log(`🏗️ Creating template database for shop: ${shopName}`);
+
+    // Create a new database with order tracking properties
+    const newDb = await notion.databases.create({
+      parent: {
+        type: 'workspace',
+        workspace: true
+      } as any,
+      title: [
+        {
+          text: {
+            content: `Shopify Orders: ${shopName}`,
+          },
+        },
+      ],
+      properties: {
+        'Order Number': {
+          type: 'title',
+          title: {}
+        },
+        'Customer Name': {
+          type: 'rich_text',
+          rich_text: {}
+        },
+        'Customer Email': {
+          type: 'email',
+          email: {}
+        },
+        'Total Price': {
+          type: 'number',
+          number: {
+            format: 'dollar'
+          }
+        },
+        'Order Status': {
+          type: 'select',
+          select: {
+            options: [
+              { name: 'Pending', color: 'yellow' },
+              { name: 'Paid', color: 'green' },
+              { name: 'Fulfilled', color: 'blue' },
+              { name: 'Cancelled', color: 'red' }
+            ]
+          }
+        },
+        'Shipping Address': {
+          type: 'rich_text',
+          rich_text: {}
+        },
+        'Items': {
+          type: 'rich_text',
+          rich_text: {}
+        },
+        'Shopify Link': {
+          type: 'url',
+          url: {}
+        },
+        'Created Date': {
+          type: 'date',
+          date: {}
+        },
+        'Notes': {
+          type: 'rich_text',
+          rich_text: {}
+        }
+      } as any
+    });
+
+    console.log(`✅ Created template database: ${newDb.id}`);
+
+    // Update user with the new database ID
+    const shopNameClean = shopName.toLowerCase();
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopNameClean);
+    
+    if (usersWithStore.length > 0) {
+      const { user } = usersWithStore[0];
+      await userStoreService.updateUserNotionDb(user.id, newDb.id);
+      console.log(`📊 Updated user ${user.id} with template database: ${newDb.id}`);
+    } else {
+      console.warn(`⚠️ No user found for shop: ${shopNameClean}, database created but not linked`);
+    }
+
+    res.json({ 
+      success: true, 
+      dbId: newDb.id,
+      message: `Successfully created template database for ${shopName}`,
+      shopName,
+      shopDomain,
+      dbUrl: `https://www.notion.so/${newDb.id.replace(/-/g, '')}`
+    });
+
+  } catch (error) {
+    console.error('❌ Error in /create-template-db:', error);
+    res.status(500).json({ 
+      error: 'Failed to create template database',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
