@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ShopifyService } from '../services/shopify';
 import { userStoreService } from '../services/userStore';
+import { NotionService } from '../services/notion';
 
 const router = Router();
 
@@ -133,24 +134,25 @@ router.get('/callback', async (req: Request, res: Response) => {
     console.log(`🏪 Shop info: ${shopInfo.name} (${shopInfo.domain})`);
 
     // Create or get user
-    const user = userStoreService.createOrGetUser(email, notionToken, notionDbId);
+    const user = await userStoreService.createOrGetUser(email, notionToken, notionDbId);
     
     // Add store to user
-    userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
+    await userStoreService.addStoreToUser(user.id, shopName, shopInfo.domain, accessToken);
 
     // 🆕 AUTO-CREATE PERSONAL NOTION DATABASE
     try {
       console.log(`🏗️ Creating personal Notion database for ${shopName}...`);
       
-      // Call our new database creation endpoint internally
-      const createDbResponse = await fetch(`${req.protocol}://${req.get('host')}/notion/create-db`, {
+      // Call our personal database creation endpoint internally
+      const createDbResponse = await fetch(`${req.protocol}://${req.get('host')}/notion/create-db-with-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           shopDomain: shopInfo.domain,
-          email: email
+          accessToken: notionToken, // Use user's personal Notion token
+          workspaceId: 'user-workspace' // Will be handled by the endpoint
         })
       });
 
@@ -159,11 +161,11 @@ router.get('/callback', async (req: Request, res: Response) => {
         console.log(`✅ Created personal database: ${dbResult.dbId}`);
         
         // Update user with the new personal database ID
-        const updateSuccess = userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
+        const updateSuccess = await userStoreService.updateUserNotionDb(user.id, dbResult.dbId);
         console.log(`📊 Updated user ${user.id} with personal database: ${dbResult.dbId} - Success: ${updateSuccess}`);
         
         // Verify the update worked
-        const updatedUser = userStoreService.getUser(user.id);
+        const updatedUser = await userStoreService.getUser(user.id);
         console.log(`🔍 Verification - User ${user.id} now has database: ${updatedUser?.notionDbId}`);
       } else {
         const errorText = await createDbResponse.text();
@@ -225,7 +227,7 @@ router.get('/callback', async (req: Request, res: Response) => {
  * GET /auth/dashboard
  * Get user dashboard with all connected stores
  */
-router.get('/dashboard', (req: Request, res: Response) => {
+router.get('/dashboard', async (req: Request, res: Response) => {
   try {
     const sessionId = req.headers.authorization?.replace('Bearer ', '');
     
@@ -236,13 +238,22 @@ router.get('/dashboard', (req: Request, res: Response) => {
       });
     }
 
-    const user = userStoreService.getUserBySession(sessionId);
+    const user = await userStoreService.getUserBySession(sessionId);
     if (!user) {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired session'
       });
     }
+
+    // Get user's stores
+    const usersWithStore = await userStoreService.getAllUsersWithStore(user.id);
+    const stores = usersWithStore.map(({ store }) => ({
+      shopName: store.shopName,
+      shopDomain: store.shopDomain,
+      connectedAt: store.connectedAt,
+      isActive: store.isActive
+    }));
 
     res.json({
       success: true,
@@ -253,15 +264,10 @@ router.get('/dashboard', (req: Request, res: Response) => {
           createdAt: user.createdAt,
           notionDbId: user.notionDbId
         },
-        stores: user.stores.filter(s => s.isActive).map(store => ({
-          shopName: store.shopName,
-          shopDomain: store.shopDomain,
-          connectedAt: store.connectedAt,
-          isActive: store.isActive
-        })),
+        stores,
         stats: {
-          totalStores: user.stores.filter(s => s.isActive).length,
-          totalConnections: user.stores.length
+          totalStores: stores.filter(s => s.isActive).length,
+          totalConnections: stores.length
         }
       }
     });
@@ -279,7 +285,7 @@ router.get('/dashboard', (req: Request, res: Response) => {
  * DELETE /auth/store/:shopName
  * Remove a store from user's account
  */
-router.delete('/store/:shopName', (req: Request, res: Response) => {
+router.delete('/store/:shopName', async (req: Request, res: Response) => {
   try {
     const sessionId = req.headers.authorization?.replace('Bearer ', '');
     const { shopName } = req.params;
@@ -291,7 +297,7 @@ router.delete('/store/:shopName', (req: Request, res: Response) => {
       });
     }
 
-    const user = userStoreService.getUserBySession(sessionId);
+    const user = await userStoreService.getUserBySession(sessionId);
     if (!user) {
       return res.status(401).json({
         error: 'Unauthorized',
@@ -299,7 +305,7 @@ router.delete('/store/:shopName', (req: Request, res: Response) => {
       });
     }
 
-    const removed = userStoreService.removeStoreFromUser(user.id, shopName);
+    const removed = await userStoreService.removeStoreFromUser(user.id, shopName);
     
     if (removed) {
       res.json({
@@ -408,7 +414,7 @@ router.get('/webhooks-debug', async (req: Request, res: Response) => {
  * GET /auth/user-info
  * Get user information including notion database ID for a shop
  */
-router.get('/user-info', (req: Request, res: Response) => {
+router.get('/user-info', async (req: Request, res: Response) => {
   try {
     const { shop } = req.query;
     
@@ -423,7 +429,7 @@ router.get('/user-info', (req: Request, res: Response) => {
     const shopName = shop.replace('.myshopify.com', '');
     
     // Find users with this store
-    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
     
     if (usersWithStore.length === 0) {
       return res.status(404).json({
@@ -459,7 +465,7 @@ router.get('/user-info', (req: Request, res: Response) => {
  * POST /auth/update-notion-db
  * Update Notion Database ID for a specific shop
  */
-router.post('/update-notion-db', (req: Request, res: Response) => {
+router.post('/update-notion-db', async (req: Request, res: Response) => {
   try {
     const { shop, notionDbId } = req.body;
     
@@ -483,7 +489,7 @@ router.post('/update-notion-db', (req: Request, res: Response) => {
     }
 
     // Find users with this store
-    const usersWithStore = userStoreService.getAllUsersWithStore(shopName);
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
     
     if (usersWithStore.length === 0) {
       return res.status(404).json({
@@ -495,7 +501,7 @@ router.post('/update-notion-db', (req: Request, res: Response) => {
     // Update the Notion DB ID for all users with this store
     let updatedCount = 0;
     for (const { user } of usersWithStore) {
-      const success = userStoreService.updateUserNotionDb(user.id, notionDbId);
+      const success = await userStoreService.updateUserNotionDb(user.id, notionDbId);
       if (success) {
         updatedCount++;
       }
@@ -643,6 +649,112 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
     console.error('❌ Error in Notion OAuth callback:', error);
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
     res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Notion OAuth failed')}`);
+  }
+});
+
+/**
+ * POST /auth/connect-store
+ * Connect a store with a Notion database
+ */
+router.post('/connect-store', async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.headers.authorization?.replace('Bearer ', '');
+    const { shopName, notionDbId } = req.body;
+
+    if (!sessionId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Session ID required'
+      });
+    }
+
+    if (!shopName || !notionDbId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Missing required fields: shopName and notionDbId'
+      });
+    }
+
+    // Get user from session
+    const user = await userStoreService.getUserBySession(sessionId);
+    if (!user) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired session'
+      });
+    }
+
+    // Extract database ID from URL if needed
+    let cleanDbId = notionDbId;
+    if (notionDbId.includes('notion.so/')) {
+      const urlParts = notionDbId.split('/');
+      cleanDbId = urlParts[urlParts.length - 1].split('?')[0];
+    }
+
+    // Validate database ID format
+    if (cleanDbId.length < 32 || !/^[a-f0-9-]+$/i.test(cleanDbId)) {
+      return res.status(400).json({
+        error: 'Invalid Database ID',
+        message: 'Notion Database ID format is invalid'
+      });
+    }
+
+    // Test database access
+    try {
+      const notionService = new NotionService(process.env.NOTION_TOKEN, cleanDbId);
+      const canAccess = await notionService.testConnection();
+      
+      if (!canAccess) {
+        return res.status(400).json({
+          error: 'Database Access Error',
+          message: 'Cannot access the provided Notion database. Please make sure it is shared with our integration.'
+        });
+      }
+    } catch (notionError) {
+      console.error('❌ Database access test failed:', notionError);
+      return res.status(400).json({
+        error: 'Database Access Error',
+        message: 'Could not access the Notion database. Please check the URL and sharing permissions.'
+      });
+    }
+
+    // Update user's Notion database ID
+    const success = await userStoreService.updateUserNotionDb(user.id, cleanDbId);
+    if (!success) {
+      return res.status(500).json({
+        error: 'Database Update Error',
+        message: 'Failed to update user database ID'
+      });
+    }
+
+    // Check if store is already connected
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
+    const storeExists = usersWithStore.some(({ user: u }) => u.id === user.id);
+
+    if (!storeExists) {
+      await userStoreService.addStoreToUser(
+        user.id,
+        shopName,
+        `${shopName}.myshopify.com`,
+        process.env.SHOPIFY_ACCESS_TOKEN || ''
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Store connected successfully',
+      data: {
+        shopName,
+        notionDbId: cleanDbId
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error connecting store:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to connect store'
+    });
   }
 });
 
