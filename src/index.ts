@@ -19,9 +19,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdn.shopify.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://unpkg.com", "https://cdn.shopify.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdn.shopify.com"],
-      connectSrc: ["'self'", "https://cdn.shopify.com"],
+      connectSrc: ["'self'", "https://cdn.shopify.com", "https://api.notion.com"],
       frameSrc: ["'self'"],
       frameAncestors: ["https://*.myshopify.com", "https://admin.shopify.com"],
     },
@@ -200,7 +200,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
               <h3 class="status-title" style="color: #00cc44;">✅ Connected to Notion!</h3>
               <p style="margin: 8px 0; color: #202223;">Your personal Notion database is ready and syncing orders automatically.</p>
               <div style="margin-top: 16px;">
-                <button class="sync-button" onclick="openUserDatabase()" style="background: #0066cc;">
+                <button class="sync-button" id="openDatabaseBtn" style="background: #0066cc;">
                   🔗 Open My Notion Dashboard
                 </button>
               </div>
@@ -213,7 +213,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
               <h3 class="status-title" style="color: #cc7a00;">🔗 Connect Your Notion</h3>
               <p style="margin: 8px 0; color: #202223;">Connect to Notion to automatically create your personal order tracking database.</p>
               <div style="margin-top: 16px;">
-                <button class="sync-button" onclick="connectToNotion()" style="background: #0066cc;" id="connectBtn">
+                <button class="sync-button" style="background: #0066cc;" id="connectBtn">
                   🔗 Connect to Notion
                 </button>
               </div>
@@ -359,6 +359,21 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
 
 
+        // Add event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+          // Connect button event listener
+          const connectBtn = document.getElementById('connectBtn');
+          if (connectBtn) {
+            connectBtn.addEventListener('click', connectToNotion);
+          }
+          
+          // Open database button event listener
+          const openDbBtn = document.getElementById('openDatabaseBtn');
+          if (openDbBtn) {
+            openDbBtn.addEventListener('click', openUserDatabase);
+          }
+        });
+
         // Initialize the app when page loads
         initializeApp();
       </script>
@@ -424,6 +439,10 @@ app.get('/', (req: express.Request, res: express.Response) => {
 
 // Smart Setup Flow - The main landing page users will see
 app.get('/setup', (req: express.Request, res: express.Response) => {
+  // Set more permissive CSP for setup page since it's not embedded
+  res.setHeader('Content-Security-Policy', 
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'");
+  
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -629,9 +648,9 @@ app.get('/setup', (req: express.Request, res: express.Response) => {
             <div class="help-text">Enter just your store name, we'll handle the rest</div>
           </div>
 
-          <button class="setup-button" onclick="startSetup()" id="setupButton">
-            🚀 Connect Store & Create Database
-          </button>
+                     <button class="setup-button" id="setupButton">
+             🚀 Connect Store & Create Database
+           </button>
 
           <div class="steps">
             <div class="steps-title">What happens next:</div>
@@ -698,12 +717,15 @@ app.get('/setup', (req: express.Request, res: express.Response) => {
           window.location.href = setupUrl;
         }
 
-        // Allow Enter key to submit
-        document.getElementById('shopName').addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-            startSetup();
-          }
-        });
+                 // Add event listeners
+         document.getElementById('setupButton').addEventListener('click', startSetup);
+         
+         // Allow Enter key to submit
+         document.getElementById('shopName').addEventListener('keypress', function(e) {
+           if (e.key === 'Enter') {
+             startSetup();
+           }
+         });
       </script>
     </body>
     </html>
