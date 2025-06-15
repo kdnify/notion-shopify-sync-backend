@@ -586,7 +586,7 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
       body: JSON.stringify({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: `https://${req.get('host')}/auth/notion-callback`
+        redirect_uri: 'https://notion-shopify-sync-backend.onrender.com/auth/notion-callback'
       })
     });
 
