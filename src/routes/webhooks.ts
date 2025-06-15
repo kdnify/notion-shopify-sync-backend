@@ -9,9 +9,15 @@ const router = Router();
 let notionService: NotionService;
 
 try {
+  console.log('🔧 Initializing Notion service...');
+  console.log('📋 NOTION_TOKEN exists:', !!process.env.NOTION_TOKEN);
+  console.log('📋 NOTION_DB_ID exists:', !!process.env.NOTION_DB_ID);
+  console.log('📋 NOTION_DB_ID value:', process.env.NOTION_DB_ID);
+  
   notionService = new NotionService();
+  console.log('✅ Notion service initialized successfully');
 } catch (error) {
-  console.error('Failed to initialize Notion service:', error);
+  console.error('❌ Failed to initialize Notion service:', error);
 }
 
 /**
