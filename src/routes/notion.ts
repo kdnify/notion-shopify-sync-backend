@@ -435,11 +435,32 @@ router.post('/create-template-db', async (req, res) => {
 
     console.log(`🏗️ Creating template database for shop: ${shopName}`);
 
-    // Create a new database with order tracking properties
-    const newDb = await notion.databases.create({
+    // First create a page to hold the database (since we can't create directly in workspace)
+    const parentPage = await notion.pages.create({
       parent: {
         type: 'workspace',
         workspace: true
+      } as any,
+      properties: {
+        title: {
+          title: [
+            {
+              text: {
+                content: `NotionSync - ${shopName}`
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    console.log(`📄 Created parent page: ${parentPage.id}`);
+
+    // Create a new database with order tracking properties
+    const newDb = await notion.databases.create({
+      parent: {
+        type: 'page_id',
+        page_id: parentPage.id
       } as any,
       title: [
         {
