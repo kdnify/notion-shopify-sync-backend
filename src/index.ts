@@ -233,12 +233,12 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             </div>
             
             <div style="margin-top: 20px;">
-              <div class="choice-option" style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 16px; margin-bottom: 16px; cursor: pointer;" onclick="showCreateOption()">
+              <div id="createChoiceBtn" class="choice-option" style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 16px; margin-bottom: 16px; cursor: pointer;">
                 <h4 style="margin: 0 0 8px 0; color: #202223;">🚀 Create New Database (Recommended)</h4>
                 <p style="margin: 0; color: #6c757d; font-size: 14px;">We'll create a beautiful order tracking database with all the right fields</p>
               </div>
               
-              <div class="choice-option" style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 16px; cursor: pointer;" onclick="showConnectOption()">
+              <div id="connectChoiceBtn" class="choice-option" style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 16px; cursor: pointer;">
                 <h4 style="margin: 0 0 8px 0; color: #202223;">🔗 Connect Existing Database</h4>
                 <p style="margin: 0; color: #6c757d; font-size: 14px;">Use a database you've already created</p>
               </div>
@@ -266,7 +266,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                 <button class="sync-button" style="background: #00cc44;" id="createDbBtn">
                   ✨ Create My Database
                 </button>
-                <button class="sync-button" style="background: #6c757d; margin-left: 8px;" onclick="showDatabaseChoice()">
+                <button id="backFromCreateBtn" class="sync-button" style="background: #6c757d; margin-left: 8px;">
                   ← Back
                 </button>
               </div>
@@ -295,7 +295,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                 <button class="sync-button" style="background: #0066cc;" id="connectDbBtn">
                   🔗 Connect Database
                 </button>
-                <button class="sync-button" style="background: #6c757d; margin-left: 8px;" onclick="showDatabaseChoice()">
+                <button id="backFromConnectBtn" class="sync-button" style="background: #6c757d; margin-left: 8px;">
                   ← Back
                 </button>
               </div>
@@ -625,6 +625,28 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           const openDbBtn = document.getElementById('openDatabaseBtn');
           if (openDbBtn) {
             openDbBtn.addEventListener('click', openUserDatabase);
+          }
+
+          // Choice buttons
+          const createChoiceBtn = document.getElementById('createChoiceBtn');
+          if (createChoiceBtn) {
+            createChoiceBtn.addEventListener('click', showCreateOption);
+          }
+
+          const connectChoiceBtn = document.getElementById('connectChoiceBtn');
+          if (connectChoiceBtn) {
+            connectChoiceBtn.addEventListener('click', showConnectOption);
+          }
+
+          // Back buttons
+          const backFromCreateBtn = document.getElementById('backFromCreateBtn');
+          if (backFromCreateBtn) {
+            backFromCreateBtn.addEventListener('click', showDatabaseChoice);
+          }
+
+          const backFromConnectBtn = document.getElementById('backFromConnectBtn');
+          if (backFromConnectBtn) {
+            backFromConnectBtn.addEventListener('click', showDatabaseChoice);
           }
         });
 
