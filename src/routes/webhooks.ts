@@ -477,4 +477,122 @@ router.post('/n8n-orders', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /webhooks/n8n-simple
+ * Simple endpoint that sends n8n data directly to the original database
+ * No user routing - just straight to the default database
+ */
+router.post('/n8n-simple', async (req: Request, res: Response) => {
+  try {
+    console.log('📦 Received n8n order for simple processing');
+    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+
+    if (!notionService) {
+      return res.status(500).json({
+        error: 'Notion service not initialized',
+        message: 'Default Notion configuration is missing'
+      });
+    }
+
+    const orderData = req.body;
+    
+    // Handle both single order and array format
+    const orders = Array.isArray(orderData) ? orderData : [orderData];
+    
+    if (orders.length === 0) {
+      return res.status(400).json({
+        error: 'No order data provided'
+      });
+    }
+
+    const results = [];
+    
+    for (const order of orders) {
+      try {
+        console.log(`📝 Processing order: ${order.orderNumber || 'unknown'}`);
+        
+        // Convert n8n format to Shopify format for Notion service
+        const shopifyFormatOrder = {
+          id: parseInt(order.orderId) || parseInt(order.rawOrderId) || 0,
+          order_number: order.orderNumber || 0,
+          name: order.orderName || '#' + order.orderNumber,
+          email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined,
+          created_at: order.createdAt,
+          updated_at: order.updatedAt,
+          cancelled_at: null,
+          closed_at: null,
+          processed_at: order.createdAt,
+          customer: {
+            first_name: order.hasCustomer ? order.customerName.split(' ')[0] : 'Manual Order',
+            last_name: order.hasCustomer ? order.customerName.split(' ').slice(1).join(' ') : 'No Customer',
+            email: order.customerEmail !== 'no-email@manual-order.com' ? order.customerEmail : undefined
+          },
+          billing_address: null,
+          shipping_address: order.shippingAddress !== 'No Address' ? { 
+            address1: order.shippingAddress 
+          } : null,
+          currency: order.currency || 'USD',
+          total_price: (order.totalPrice || 0).toString(),
+          subtotal_price: (order.subtotalPrice || 0).toString(),
+          total_tax: (order.totalTax || 0).toString(),
+          line_items: [{
+            title: order.lineItems || 'Order Item',
+            quantity: 1,
+            price: (order.totalPrice || 0).toString()
+          }],
+          fulfillment_status: order.orderStatus ? order.orderStatus.toLowerCase() : 'unfulfilled',
+          financial_status: order.paymentStatus || 'pending',
+          tags: order.tags || '',
+          note: order.note || '',
+          gateway: 'shopify',
+          test: order.isTest || false,
+          order_status_url: order.shopifyAdminLink || ''
+        };
+
+        // Send directly to default Notion database
+        const notionPageId = await notionService.createOrderPage(shopifyFormatOrder as any);
+        
+        results.push({
+          orderId: order.orderId || order.rawOrderId,
+          orderNumber: order.orderNumber,
+          success: true,
+          notionPageId: notionPageId,
+          message: 'Successfully synced to default database'
+        });
+        
+        console.log(`✅ Synced order #${order.orderNumber} to default database`);
+        
+      } catch (orderError) {
+        console.error(`❌ Failed to process order:`, orderError);
+        results.push({
+          orderId: order.orderId || order.rawOrderId || 'unknown',
+          orderNumber: order.orderNumber || 'unknown',
+          success: false,
+          error: orderError instanceof Error ? orderError.message : String(orderError)
+        });
+      }
+    }
+
+    const successfulSyncs = results.filter(r => r.success).length;
+    
+    res.json({
+      success: successfulSyncs > 0,
+      message: `Successfully processed ${successfulSyncs}/${results.length} orders to default database`,
+      data: {
+        processedOrders: results.length,
+        successfulSyncs: successfulSyncs,
+        results: results
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in n8n-simple endpoint:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to process order',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router; 
