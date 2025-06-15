@@ -185,20 +185,8 @@ app.get('/app', (req: express.Request, res: express.Response) => {
         ` : ''}
 
         <div class="status-card">
-          <h3 class="status-title">✅ Integration Active</h3>
-          <ul class="status-list">
-            <li>Connected to shop: <strong>${shop}</strong></li>
-            <li>Webhook monitoring: Active</li>
-            <li>Notion database: Connected</li>
-            <li>Order sync: Real-time</li>
-          </ul>
-        </div>
-
-        <div>
-          <button class="sync-button" onclick="testSync()">🔄 Test Sync</button>
-          <button class="sync-button" onclick="viewLogs()">📋 View Logs</button>
-          <button class="sync-button" onclick="refreshStatus()">🔍 Refresh Status</button>
-          <button class="sync-button" onclick="initializeApp()" style="background: #0066cc;">🔄 Check Database</button>
+          <h3 class="status-title">✅ App Installed</h3>
+          <p style="margin: 8px 0; color: #202223;">Connected to shop: <strong>${shop}</strong></p>
         </div>
 
         <div class="settings-section">
@@ -233,29 +221,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           <div id="setupStatus" style="display: none; padding: 12px; border-radius: 6px; margin-top: 16px;"></div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="section-title">Integration Details</h2>
-          <div class="info-row">
-            <span class="info-label">Shop Domain:</span>
-            <span class="info-value">${shop}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">App Status:</span>
-            <span class="info-value">Active & Monitoring</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Last Sync:</span>
-            <span class="info-value" id="lastSync">Checking...</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Orders Synced:</span>
-            <span class="info-value" id="orderCount">Loading...</span>
-          </div>
-        </div>
 
-        <div id="logs" class="logs" style="display: none;">
-          <div id="logContent">Loading logs...</div>
-        </div>
       </div>
 
       <script>
@@ -346,143 +312,23 @@ app.get('/app', (req: express.Request, res: express.Response) => {
 
         function openUserDatabase() {
           if (currentNotionDbId) {
+            // Construct proper Notion database URL
             const notionUrl = 'https://www.notion.so/' + currentNotionDbId.replace(/-/g, '');
+            console.log('Opening Notion database:', notionUrl);
             window.open(notionUrl, '_blank');
+          } else {
+            console.log('No database ID available');
+            const toast = Toast.create(app, {
+              message: '❌ No database connected yet',
+              duration: 3000
+            });
+            toast.dispatch(Toast.Action.SHOW);
           }
         }
 
         // App functions
-        function testSync() {
-          const toast = Toast.create(app, {
-            message: 'Testing sync connection...',
-            duration: 2000
-          });
-          toast.dispatch(Toast.Action.SHOW);
-          
-          // Simulate test
-          setTimeout(() => {
-            const successToast = Toast.create(app, {
-              message: '✅ Sync test successful!',
-              duration: 3000
-            });
-            successToast.dispatch(Toast.Action.SHOW);
-          }, 2000);
-        }
 
-        function viewLogs() {
-          const logsDiv = document.getElementById('logs');
-          if (logsDiv.style.display === 'none') {
-            logsDiv.style.display = 'block';
-            // Simulate log loading
-            document.getElementById('logContent').innerHTML = 
-              '[' + new Date().toISOString() + '] Webhook received: order.created\\n' +
-              '[' + new Date().toISOString() + '] Syncing order #1001 to Notion...\\n' +
-              '[' + new Date().toISOString() + '] ✅ Order synced successfully\\n' +
-              '[' + new Date().toISOString() + '] Notion page created: Order #1001';
-          } else {
-            logsDiv.style.display = 'none';
-          }
-        }
 
-        function refreshStatus() {
-          document.getElementById('lastSync').textContent = 'Just now';
-          document.getElementById('orderCount').textContent = '12 orders';
-          
-          const toast = Toast.create(app, {
-            message: '🔄 Status refreshed',
-            duration: 2000
-          });
-          toast.dispatch(Toast.Action.SHOW);
-        }
-
-        function openNotionTemplate() {
-          const notionUrl = 'https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b&source=copy_link';
-          window.open(notionUrl, '_blank');
-        }
-
-        async function updateNotionDb() {
-          const notionDbId = document.getElementById('notionDbId').value.trim();
-          const updateBtn = document.getElementById('updateBtn');
-          const statusDiv = document.getElementById('setupStatus');
-          
-          if (!notionDbId) {
-            showStatus('Please enter a Notion Database ID', 'error');
-            return;
-          }
-
-          // Validate Database ID format (basic check)
-          if (notionDbId.length < 32 || !/^[a-f0-9]+$/i.test(notionDbId.replace(/-/g, ''))) {
-            showStatus('Invalid Database ID format. Please check and try again.', 'error');
-            return;
-          }
-
-          updateBtn.disabled = true;
-          updateBtn.textContent = '⏳ Updating...';
-          
-          try {
-            const response = await fetch('/auth/update-notion-db', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                shop: '${shop}',
-                notionDbId: notionDbId
-              })
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-              showStatus('✅ Notion database updated successfully! Future orders will sync to your database.', 'success');
-              document.getElementById('notionDbId').value = '';
-              
-              // Update the display to show the database info
-              currentNotionDbId = notionDbId;
-              showDatabaseInfo(notionDbId);
-              
-              const toast = Toast.create(app, {
-                message: '✅ Notion sync updated successfully',
-                duration: 3000
-              });
-              toast.dispatch(Toast.Action.SHOW);
-            } else {
-              showStatus('❌ Error: ' + (result.message || 'Failed to update database'), 'error');
-            }
-          } catch (error) {
-            showStatus('❌ Network error. Please try again.', 'error');
-          } finally {
-            updateBtn.disabled = false;
-            updateBtn.textContent = '✅ Update My Notion Sync';
-          }
-        }
-
-        function showStatus(message, type) {
-          const statusDiv = document.getElementById('setupStatus');
-          statusDiv.style.display = 'block';
-          statusDiv.textContent = message;
-          
-          if (type === 'success') {
-            statusDiv.style.background = '#f0fff4';
-            statusDiv.style.border = '1px solid #b3ffcc';
-            statusDiv.style.color = '#00cc44';
-          } else {
-            statusDiv.style.background = '#fff2f2';
-            statusDiv.style.border = '1px solid #ffb3b3';
-            statusDiv.style.color = '#cc0000';
-          }
-          
-          // Hide after 5 seconds
-          setTimeout(() => {
-            statusDiv.style.display = 'none';
-          }, 5000);
-        }
-
-        // Initialize status on load
-        setTimeout(() => {
-          document.getElementById('lastSync').textContent = '2 minutes ago';
-          document.getElementById('orderCount').textContent = '12 orders';
-        }, 1000);
 
         // Initialize the app when page loads
         initializeApp();
