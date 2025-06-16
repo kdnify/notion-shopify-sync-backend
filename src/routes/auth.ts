@@ -1485,12 +1485,12 @@ router.get('/get-or-create-session', async (req: Request, res: Response) => {
     console.log(`🔑 Getting or creating session for shop: ${shopName}`);
 
     // Get existing user or create one with dummy credentials
-    let user = await userStoreService.getUserByEmail(`${shopName}@shop.local`);
+    let user = await userStoreService.getUserByEmail(`${shopName}@shopify.local`);
     
     if (!user) {
       console.log(`👤 Creating new user for shop: ${shopName}`);
       // Create user with placeholder credentials that will be updated later
-      user = await userStoreService.createOrGetUser(`${shopName}@shop.local`, 'placeholder-token', 'placeholder-db');
+      user = await userStoreService.createOrGetUser(`${shopName}@shopify.local`, 'placeholder-token', 'placeholder-db');
     }
 
     if (!user) {
