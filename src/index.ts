@@ -225,7 +225,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                    <div style="flex: 1;">
                      <strong>Duplicate our template database</strong>
                      <div style="margin-top: 4px;">
-                       <a href="https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5?v=&pvs=4" target="_blank" 
+                       <a href="https://clean-koala-e33.notion.site/212e8f5ac14a807fb67ac1887df275d5?v=212e8f5ac14a807e8715000ca8a6b13b" target="_blank" 
                           style="background: #000; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">
                          📋 Open Template & Duplicate
                        </a>
