@@ -219,19 +219,27 @@ app.get('/app', (req: express.Request, res: express.Response) => {
               <p style="margin: 8px 0; color: #202223;">Follow these simple steps to connect your own Notion database:</p>
               
               <div style="margin-top: 20px;">
-                <!-- Step 1: Duplicate Database -->
-                <div style="display: flex; align-items: center; margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px;">
-                  <div style="background: #3182ce; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; font-size: 12px;">1</div>
-                  <div style="flex: 1;">
-                    <strong>Duplicate our template database</strong>
-                    <div style="margin-top: 4px;">
-                      <a href="https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5?v=&pvs=4" target="_blank" 
-                         style="background: #000; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">
-                        📋 Open Template & Duplicate
-                      </a>
-                    </div>
-                  </div>
-                </div>
+                                 <!-- Step 1: Duplicate Database -->
+                 <div style="display: flex; align-items: start; margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px;">
+                   <div style="background: #3182ce; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; font-size: 12px; margin-top: 4px;">1</div>
+                   <div style="flex: 1;">
+                     <strong>Duplicate our template database</strong>
+                     <div style="margin-top: 4px;">
+                       <a href="https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5?v=&pvs=4" target="_blank" 
+                          style="background: #000; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">
+                         📋 Open Template & Duplicate
+                       </a>
+                     </div>
+                     <div style="margin-top: 8px; font-size: 12px; color: #6b7280; line-height: 1.4;">
+                       💡 <strong>First time using Notion?</strong><br/>
+                       1. Click the link above to open our template<br/>
+                       2. <strong>Create a free Notion account</strong> (or log in if you have one)<br/>
+                       3. Once logged in, you'll see a <strong>"Duplicate"</strong> button in the top-right corner<br/>
+                       4. Click "Duplicate" to create your own copy of the template<br/>
+                       5. Copy the URL of your new database (it will look like: notion.so/YOUR-DATABASE-ID)
+                     </div>
+                   </div>
+                 </div>
                 
                 <!-- Step 2: Paste URL -->
                 <div style="display: flex; align-items: start; margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px;">
@@ -242,6 +250,9 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                       <input type="url" id="databaseUrl" placeholder="https://www.notion.so/your-database-id"
                              style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 14px;"
                              onchange="validateDatabaseUrl()"/>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 11px; color: #9ca3af; font-style: italic;">
+                      💡 After duplicating, copy the URL from your browser's address bar
                     </div>
                   </div>
                 </div>
