@@ -323,6 +323,9 @@ router.post('/n8n-orders', async (req: Request, res: Response) => {
   try {
     console.log('📦 Received n8n processed order data');
     console.log('📋 Raw request body:', JSON.stringify(req.body, null, 2));
+    console.log('📋 Request headers:', JSON.stringify(req.headers, null, 2));
+    console.log('📋 Body type:', typeof req.body);
+    console.log('📋 Body constructor:', req.body?.constructor?.name);
 
     const orderData = req.body;
     
