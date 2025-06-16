@@ -173,14 +173,14 @@ router.get('/callback', async (req: Request, res: Response) => {
     const sessionId = await userStoreService.createSession(validUser.id);
     console.log(`🎫 Created session: ${sessionId}`);
 
-    // 🎯 NEW SIMPLIFIED FLOW - Redirect to setup page
+    // 🎯 FIXED: Redirect to embedded app instead of external setup page
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
     
-    // Redirect to setup page where user can duplicate database and connect
-    const setupUrl = `${appUrl}/setup?shop=${shopInfo.domain}&session=${sessionId}`;
+    // Redirect to embedded app with session parameter
+    const embeddedAppUrl = `${appUrl}/app?shop=${shopInfo.domain}&session=${sessionId}`;
     
-    console.log(`🔄 Redirecting to setup page: ${setupUrl}`);
-    res.redirect(setupUrl);
+    console.log(`🔄 Redirecting to embedded app: ${embeddedAppUrl}`);
+    res.redirect(embeddedAppUrl);
 
   } catch (error) {
     console.error('❌ Error in OAuth callback:', error);

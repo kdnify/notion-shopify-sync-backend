@@ -212,15 +212,52 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             </div>
           </div>
           
-          <!-- Not Connected State -->
+          <!-- Not Connected State - New Simplified Flow -->
           <div id="databaseNotConnected">
             <div class="status-card" style="background: #fff9e6; border-color: #ffeb99;">
-              <h3 class="status-title" style="color: #cc7a00;">🔗 Connect Your Notion</h3>
-              <p style="margin: 8px 0; color: #202223;">Connect to Notion to automatically create your personal order tracking database.</p>
-              <div style="margin-top: 16px;">
-                <button class="sync-button" style="background: #0066cc;" id="connectBtn">
-                  🔗 Connect to Notion
-                </button>
+              <h3 class="status-title" style="color: #cc7a00;">🎯 Set up your personal order tracking</h3>
+              <p style="margin: 8px 0; color: #202223;">Follow these simple steps to connect your own Notion database:</p>
+              
+              <div style="margin-top: 20px;">
+                <!-- Step 1: Duplicate Database -->
+                <div style="display: flex; align-items: center; margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px;">
+                  <div style="background: #3182ce; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; font-size: 12px;">1</div>
+                  <div style="flex: 1;">
+                    <strong>Duplicate our template database</strong>
+                    <div style="margin-top: 4px;">
+                      <a href="https://www.notion.so/212e8f5ac14a807fb67ac1887df275d5?v=&pvs=4" target="_blank" 
+                         style="background: #000; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">
+                        📋 Open Template & Duplicate
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Step 2: Paste URL -->
+                <div style="display: flex; align-items: start; margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px;">
+                  <div style="background: #3182ce; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; font-size: 12px; margin-top: 4px;">2</div>
+                  <div style="flex: 1;">
+                    <strong>Paste your new database URL</strong>
+                    <div style="margin-top: 8px;">
+                      <input type="url" id="databaseUrl" placeholder="https://www.notion.so/your-database-id"
+                             style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 14px;"
+                             onchange="validateDatabaseUrl()"/>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Step 3: Connect -->
+                <div style="display: flex; align-items: center; margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px;">
+                  <div style="background: #3182ce; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; font-size: 12px;">3</div>
+                  <div style="flex: 1;">
+                    <strong>Connect to your database</strong>
+                    <div style="margin-top: 8px;">
+                      <button class="sync-button" style="background: #38a169;" id="connectDatabaseBtn" disabled>
+                        🔗 Connect to Notion
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -601,12 +638,68 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           }
         }
 
+        // NEW: Functions for simplified workflow
+        function validateDatabaseUrl() {
+          const urlInput = document.getElementById('databaseUrl');
+          const connectBtn = document.getElementById('connectDatabaseBtn');
+          
+          if (urlInput && connectBtn) {
+            const url = urlInput.value.trim();
+            if (url && url.includes('notion.so/')) {
+              connectBtn.disabled = false;
+              connectBtn.style.background = '#38a169';
+            } else {
+              connectBtn.disabled = true;
+              connectBtn.style.background = '#a0aec0';
+            }
+          }
+        }
+
+        async function connectToDatabase() {
+          const urlInput = document.getElementById('databaseUrl');
+          const connectBtn = document.getElementById('connectDatabaseBtn');
+          
+          if (!urlInput || !urlInput.value.trim()) {
+            alert('Please enter your database URL first');
+            return;
+          }
+
+          const url = urlInput.value.trim();
+          if (!url.includes('notion.so/')) {
+            alert('Please enter a valid Notion database URL');
+            return;
+          }
+
+          // Extract database ID from URL
+          let dbId = url.split('/').pop().split('?')[0];
+          if (dbId.length < 32) {
+            alert('Invalid database URL. Please make sure you copied the full URL.');
+            return;
+          }
+
+          if (connectBtn) {
+            connectBtn.textContent = '⏳ Connecting...';
+            connectBtn.disabled = true;
+          }
+
+          // Start the Notion OAuth process with the database ID
+          const urlParams = new URLSearchParams(window.location.search);
+          const session = urlParams.get('session') || '${session}' || 'embedded-app-session';
+          window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+        }
+
         // Add event listeners
         document.addEventListener('DOMContentLoaded', function() {
-          // Connect button event listener
+          // Connect button event listener (old)
           const connectBtn = document.getElementById('connectBtn');
           if (connectBtn) {
             connectBtn.addEventListener('click', connectToNotion);
+          }
+
+          // NEW: Connect database button (simplified flow)
+          const connectDatabaseBtn = document.getElementById('connectDatabaseBtn');
+          if (connectDatabaseBtn) {
+            connectDatabaseBtn.addEventListener('click', connectToDatabase);
           }
 
           // Create database button
