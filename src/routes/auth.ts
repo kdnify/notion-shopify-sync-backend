@@ -654,7 +654,7 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         
         // 🎉 SUCCESS - Redirect to completion page
         const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-        const completionUrl = `${appUrl}/complete?shop=${shopDomain}&session=${sessionId}`;
+        const completionUrl = `${appUrl}/auth/complete?shop=${shopDomain}&session=${sessionId}`;
         
         console.log(`🎉 SETUP COMPLETE! Redirecting to: ${completionUrl}`);
         res.redirect(completionUrl);
@@ -701,7 +701,7 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         
         // 🎉 SUCCESS - Redirect to app with success message
         const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-        const successUrl = `${appUrl}/app?shop=${shopDomain}&setup=complete&db=${dbResult.dbId}`;
+        const successUrl = `${appUrl}/auth/complete?shop=${shopDomain}&setup=complete&db=${dbResult.dbId}`;
         
         console.log(`🎉 ONBOARDING COMPLETE! Redirecting to: ${successUrl}`);
         res.redirect(successUrl);
@@ -1351,7 +1351,7 @@ router.get('/notion-callback-simple', async (req: Request, res: Response) => {
     
     // 🎉 SUCCESS - Redirect to completion page with option to sync last 30 days
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-    const completionUrl = `${appUrl}/complete?shop=${shopDomain}&session=${sessionId}`;
+    const completionUrl = `${appUrl}/auth/complete?shop=${shopDomain}&session=${sessionId}`;
     
     console.log(`🎉 SETUP COMPLETE! Redirecting to: ${completionUrl}`);
     res.redirect(completionUrl);
