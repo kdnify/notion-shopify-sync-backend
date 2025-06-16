@@ -1365,180 +1365,105 @@ router.get('/notion-callback-simple', async (req: Request, res: Response) => {
 
 /**
  * GET /auth/complete
- * Completion page with option to sync last 30 days
+ * OAuth completion page - shows success and closes popup
  */
 router.get('/complete', async (req: Request, res: Response) => {
   try {
     const { shop, session } = req.query;
     
-    if (!shop || !session) {
-      // Even on error, if this is a popup, we should handle it
-      if (req.headers['sec-fetch-dest'] === 'document' || req.query.popup === 'true') {
-        return res.send(getPopupCloseHtml(shop as string, session as string, 'Missing parameters'));
-      }
-      return res.status(400).json({
-        error: 'Missing required parameters: shop and session'
-      });
-    }
+    console.log(`🎉 OAuth completion page accessed for shop: ${shop}, session: ${session}`);
+    
+    // Generate popup close HTML
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connection Complete</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f6f6f7;
+        }
+        .success-card {
+            background: white;
+            padding: 32px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 400px;
+        }
+        .success-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .success-title {
+            color: #00cc44;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .success-message {
+            color: #6d7175;
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-card">
+        <div class="success-icon">✅</div>
+        <h1 class="success-title">Connected Successfully!</h1>
+        <p class="success-message">Your Notion database is now connected and ready to sync orders.</p>
+        <p style="color: #9ca3af; font-size: 14px;">This window will close automatically...</p>
+    </div>
+    
+    <script>
+        // Send success message to parent window
+        if (window.opener) {
+            window.opener.postMessage({
+                type: 'NOTION_OAUTH_SUCCESS',
+                shop: '${shop}',
+                session: '${session}'
+            }, '*');
+        }
+        
+        // Close popup after a short delay
+        setTimeout(() => {
+            window.close();
+        }, 2000);
+    </script>
+</body>
+</html>`;
 
-    // Verify session
-    const user = await userStoreService.getUserBySession(session as string);
-    if (!user) {
-      // If session is invalid but this might be a popup, still handle popup close
-      console.log(`⚠️ Invalid session for completion, but handling popup close for shop: ${shop}`);
-      return res.send(getPopupCloseHtml(shop as string, session as string, 'Session expired but OAuth succeeded'));
-    }
-
-    console.log(`🎊 Completion page for user ${user.id} and shop ${shop}`);
-
-    const completionPageHtml = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Setup Complete - NotionShopifySync</title>
-        <style>
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                max-width: 600px;
-                margin: 50px auto;
-                padding: 20px;
-                background: #f8f9fa;
-                text-align: center;
-            }
-            .container {
-                background: white;
-                padding: 40px;
-                border-radius: 12px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            }
-            .success-icon {
-                font-size: 64px;
-                margin-bottom: 20px;
-            }
-            h1 {
-                color: #38a169;
-                margin-bottom: 20px;
-            }
-            .info-box {
-                background: #e6fffa;
-                border: 1px solid #38a169;
-                border-radius: 8px;
-                padding: 20px;
-                margin: 25px 0;
-                text-align: left;
-            }
-            .sync-btn {
-                background: #3182ce;
-                color: white;
-                padding: 15px 30px;
-                border: none;
-                border-radius: 6px;
-                font-size: 16px;
-                cursor: pointer;
-                margin: 10px;
-            }
-            .sync-btn:hover {
-                background: #2c5282;
-            }
-            .view-btn {
-                background: #000;
-                color: white;
-                padding: 15px 30px;
-                border: none;
-                border-radius: 6px;
-                font-size: 16px;
-                cursor: pointer;
-                margin: 10px;
-                text-decoration: none;
-                display: inline-block;
-            }
-            .view-btn:hover {
-                background: #333;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="success-icon">🎉</div>
-            <h1>Setup Complete!</h1>
-            <p>Your Shopify store is now connected to your personal Notion database.</p>
-            
-            <div class="info-box">
-                <h3>✅ What's working now:</h3>
-                <ul>
-                    <li><strong>New orders</strong> will automatically sync to your Notion database</li>
-                    <li><strong>Webhooks</strong> are configured and active</li>
-                    <li><strong>Your data</strong> is private and secure in your own database</li>
-                </ul>
-            </div>
-            
-            <h3>Want to sync your existing orders?</h3>
-            <p>You can import the last 30 days of orders from your Shopify store.</p>
-            
-            <button class="sync-btn" onclick="syncLastMonth()">
-                📥 Sync Last 30 Days
-            </button>
-            
-            <br><br>
-            
-            <a href="https://www.notion.so/${user.notionDbId || 'your-database'}" target="_blank" class="view-btn">
-                👀 View Your Database
-            </a>
-        </div>
-
-        <script>
-            // Check if we're in a popup window
-            if (window.opener && window.opener !== window) {
-                // We're in a popup - notify parent and close
-                console.log('In popup - notifying parent and closing');
-                
-                // Post message to parent window
-                window.opener.postMessage({
-                    type: 'NOTION_OAUTH_SUCCESS',
-                    shop: '${shop}',
-                    session: '${session}'
-                }, '*');
-                
-                // Close popup after a short delay
-                setTimeout(() => {
-                    window.close();
-                }, 2000);
-                
-                // Show brief message
-                document.body.innerHTML = '<div style="text-align: center; padding: 50px; font-family: Arial;"><h2>✅ Success!</h2><p>Closing window...</p></div>';
-            }
-            
-            function syncLastMonth() {
-                if (confirm('This will import the last 30 days of orders. Continue?')) {
-                    fetch('/auth/sync-historical?shop=${shop}&session=${session}&days=30', {
-                        method: 'POST'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Sync started! Check your Notion database in a few moments.');
-                        } else {
-                            alert('Sync failed: ' + data.error);
-                        }
-                    })
-                    .catch(error => {
-                        alert('Sync failed: ' + error.message);
-                    });
-                }
-            }
-        </script>
-    </body>
-    </html>`;
-
-    res.send(completionPageHtml);
-
+    res.send(html);
+    
   } catch (error) {
     console.error('❌ Error in completion page:', error);
-    res.status(500).json({
-      error: 'Failed to load completion page'
-    });
+    
+    // Still close the popup even on error
+    const errorHtml = `
+<!DOCTYPE html>
+<html>
+<head><title>Connection Complete</title></head>
+<body>
+    <script>
+        if (window.opener) {
+            window.opener.postMessage({
+                type: 'NOTION_OAUTH_SUCCESS',
+                shop: '${req.query.shop}',
+                session: '${req.query.session}'
+            }, '*');
+        }
+        setTimeout(() => window.close(), 1000);
+    </script>
+</body>
+</html>`;
+    
+    res.send(errorHtml);
   }
 });
 
@@ -1688,7 +1613,6 @@ function getPopupCloseHtml(shop: string, session: string, message: string = 'Suc
                 border-radius: 12px;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
                 max-width: 400px;
-                margin: 0 auto;
             }
             .success-icon {
                 font-size: 48px;
