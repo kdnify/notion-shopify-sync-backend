@@ -551,9 +551,11 @@ router.post('/update-notion-db', async (req: Request, res: Response) => {
  * Handles Notion OAuth callback and creates personal database
  */
 router.get('/notion-callback', async (req: Request, res: Response) => {
+  console.log('🚀 OAuth callback started');
+  console.log('📝 Query params:', req.query);
+  console.log('🕐 Timestamp:', new Date().toISOString());
+  
   try {
-    console.log('📥 Received Notion OAuth callback:', req.query);
-
     const { code, state, error } = req.query;
 
     if (error) {
@@ -720,11 +722,10 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
       const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
       res.redirect(`${appUrl}/app?shop=${shopDomain}&notion_auth=completed`);
     }
-
   } catch (error) {
     console.error('❌ Error in Notion OAuth callback:', error);
     const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
-    res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Notion OAuth failed')}`);
+    res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Connection failed')}`);
   }
 });
 
@@ -1931,6 +1932,27 @@ router.delete('/delete-test-user', async (req: Request, res: Response) => {
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to delete test user'
+    });
+  }
+});
+
+/**
+ * GET /auth/debug-oauth-logs
+ * Debug endpoint to show recent OAuth attempts
+ */
+router.get('/debug-oauth-logs', async (req: Request, res: Response) => {
+  try {
+    // This is a simple debug endpoint - in production you'd want proper logging
+    res.json({
+      success: true,
+      message: 'Check server console for OAuth callback logs',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error in debug endpoint:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to get debug info'
     });
   }
 });
