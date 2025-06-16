@@ -642,7 +642,7 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         console.log(`🔍 Verification - Updated user database ID: ${updatedUser?.notionDbId}`);
         
         // Test database access
-        const NotionService = require('../services/notion').default;
+        const { NotionService } = require('../services/notion');
         const testNotionService = new NotionService(tokenData.access_token, dbId);
         const canAccess = await testNotionService.testConnection();
         
@@ -1334,7 +1334,7 @@ router.get('/notion-callback-simple', async (req: Request, res: Response) => {
     
     // Test database access to make sure it works
     try {
-      const NotionService = require('../services/notion').default;
+      const { NotionService } = require('../services/notion');
       const testNotionService = new NotionService(tokenData.access_token, dbId);
       const canAccess = await testNotionService.testConnection();
       
@@ -1953,6 +1953,64 @@ router.get('/debug-oauth-logs', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to get debug info'
+    });
+  }
+});
+
+/**
+ * GET /auth/test-db-update
+ * Test endpoint to simulate database update
+ */
+router.get('/test-db-update', async (req: Request, res: Response) => {
+  try {
+    const { shop, dbId } = req.query;
+    
+    if (!shop || !dbId) {
+      return res.status(400).json({
+        error: 'Missing parameters',
+        message: 'Requires ?shop=SHOP&dbId=DATABASE_ID'
+      });
+    }
+    
+    // Get user info first
+    const shopName = (shop as string).replace('.myshopify.com', '');
+    const usersWithStore = await userStoreService.getAllUsersWithStore(shopName);
+    
+    if (usersWithStore.length === 0) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: `No user found for shop ${shop}`
+      });
+    }
+    
+    const { user } = usersWithStore[0];
+    console.log(`🧪 Test: Updating user ${user.id} with database ${dbId}`);
+    
+    // Try to update the database ID
+    const updateSuccess = await userStoreService.updateUserNotionDb(user.id, dbId as string);
+    console.log(`🧪 Test: Update result: ${updateSuccess}`);
+    
+    // Verify the update
+    const updatedUser = await userStoreService.getUser(user.id);
+    console.log(`🧪 Test: Updated user database ID: ${updatedUser?.notionDbId}`);
+    
+    res.json({
+      success: true,
+      message: 'Test database update completed',
+      data: {
+        userId: user.id,
+        originalDbId: user.notionDbId,
+        newDbId: dbId,
+        updateSuccess,
+        verifiedDbId: updatedUser?.notionDbId
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Test endpoint error:', error);
+    res.status(500).json({
+      error: 'Test failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
