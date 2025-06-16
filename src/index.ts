@@ -247,7 +247,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                   <div style="flex: 1;">
                     <strong>Paste your new database URL</strong>
                     <div style="margin-top: 8px;">
-                      <input type="url" id="databaseUrl" placeholder="https://your-workspace.notion.site/your-database-id"
+                      <input type="url" id="databaseUrl" placeholder="https://www.notion.so/your-database-id"
                              style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 14px;"
                              oninput="validateDatabaseUrl()" onchange="validateDatabaseUrl()"/>
                     </div>
@@ -654,15 +654,23 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           const urlInput = document.getElementById('databaseUrl');
           const connectBtn = document.getElementById('connectDatabaseBtn');
           
+          console.log('Validating URL...', urlInput, connectBtn);
+          
           if (urlInput && connectBtn) {
             const url = urlInput.value.trim();
+            console.log('URL value:', url);
+            
             if (url && (url.includes('notion.so/') || url.includes('notion.site/'))) {
+              console.log('URL is valid, enabling button');
               connectBtn.disabled = false;
               connectBtn.style.background = '#38a169';
             } else {
+              console.log('URL is invalid, disabling button');
               connectBtn.disabled = true;
               connectBtn.style.background = '#a0aec0';
             }
+          } else {
+            console.log('Could not find elements:', { urlInput, connectBtn });
           }
         }
 
