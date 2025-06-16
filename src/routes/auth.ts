@@ -621,11 +621,23 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
     if (dbId) {
       // 🎯 SIMPLIFIED FLOW - User provided their own database
       console.log(`🔗 Connecting to user-provided database: ${dbId}`);
+      console.log(`👤 User ID from state: ${userId}`);
+      console.log(`🏪 Shop domain: ${shopDomain}`);
       
       try {
         // Update user with their database ID
+        console.log(`📊 Attempting to update user ${userId} with database: ${dbId}`);
         const updateSuccess = await userStoreService.updateUserNotionDb(userId, dbId);
-        console.log(`📊 Updated user ${userId} with database: ${dbId} - Success: ${updateSuccess}`);
+        console.log(`📊 Update result: ${updateSuccess}`);
+        
+        if (!updateSuccess) {
+          console.error(`❌ Failed to update user ${userId} with database ${dbId}`);
+          throw new Error('Failed to save database ID to user record');
+        }
+        
+        // Verify the update worked
+        const updatedUser = await userStoreService.getUser(userId);
+        console.log(`🔍 Verification - Updated user database ID: ${updatedUser?.notionDbId}`);
         
         // Test database access
         const NotionService = require('../services/notion').default;
@@ -645,7 +657,6 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         console.log(`🎉 SETUP COMPLETE! Redirecting to: ${completionUrl}`);
         res.redirect(completionUrl);
         return;
-        
       } catch (dbError) {
         console.error('❌ Database connection test failed:', dbError);
         const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
