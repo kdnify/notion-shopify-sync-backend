@@ -248,8 +248,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                     <strong>Paste your new database URL</strong>
                     <div style="margin-top: 8px;">
                       <input type="url" id="databaseUrl" placeholder="https://www.notion.so/your-database-id"
-                             style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 14px;"
-                             oninput="validateDatabaseUrl()" onchange="validateDatabaseUrl()"/>
+                             style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 14px;"/>
                     </div>
                     <div style="margin-top: 6px; font-size: 11px; color: #9ca3af; font-style: italic;">
                       💡 After duplicating, copy the URL from your browser's address bar
@@ -719,6 +718,17 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           const connectDatabaseBtn = document.getElementById('connectDatabaseBtn');
           if (connectDatabaseBtn) {
             connectDatabaseBtn.addEventListener('click', connectToDatabase);
+          }
+
+          // Database URL input validation
+          const databaseUrlInput = document.getElementById('databaseUrl');
+          if (databaseUrlInput) {
+            databaseUrlInput.addEventListener('input', validateDatabaseUrl);
+            databaseUrlInput.addEventListener('change', validateDatabaseUrl);
+            databaseUrlInput.addEventListener('paste', function() {
+              // Small delay to let paste complete
+              setTimeout(validateDatabaseUrl, 100);
+            });
           }
 
           // Create database button
