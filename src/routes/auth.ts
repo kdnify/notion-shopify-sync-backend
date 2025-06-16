@@ -136,6 +136,14 @@ router.get('/callback', async (req: Request, res: Response) => {
         '' // No database ID yet - will be set after creation
       );
       console.log(`✅ Created new user: ${user!.id}`);
+      
+      // Also create the store connection so the user can be found by webhooks
+      try {
+        await userStoreService.addStoreToUser(user.id, shopName, `${shopName}.myshopify.com`, 'placeholder-access-token');
+        console.log(`🔗 Connected store ${shopName} to user ${user.id}`);
+      } catch (storeError) {
+        console.warn(`⚠️ Failed to connect store to user:`, storeError);
+      }
     }
 
     if (!user) {
@@ -1491,6 +1499,14 @@ router.get('/get-or-create-session', async (req: Request, res: Response) => {
       console.log(`👤 Creating new user for shop: ${shopName}`);
       // Create user with placeholder credentials that will be updated later
       user = await userStoreService.createOrGetUser(`${shopName}@shopify.local`, 'placeholder-token', 'placeholder-db');
+      
+      // Also create the store connection so the user can be found by webhooks
+      try {
+        await userStoreService.addStoreToUser(user.id, shopName, `${shopName}.myshopify.com`, 'placeholder-access-token');
+        console.log(`🔗 Connected store ${shopName} to user ${user.id}`);
+      } catch (storeError) {
+        console.warn(`⚠️ Failed to connect store to user:`, storeError);
+      }
     }
 
     if (!user) {
