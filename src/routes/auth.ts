@@ -1807,4 +1807,68 @@ router.get('/fix-user-db', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /auth/create-test-user
+ * Create a test user for debugging purposes
+ */
+router.post('/create-test-user', async (req: Request, res: Response) => {
+  try {
+    const { shop, dbId } = req.body;
+    
+    if (!shop || !dbId) {
+      return res.status(400).json({
+        error: 'Missing parameters',
+        message: 'Requires shop and dbId in request body'
+      });
+    }
+    
+    const shopName = shop.replace('.myshopify.com', '');
+    const userEmail = `${shopName}@shopify.local`;
+    
+    console.log(`Creating test user for shop: ${shop}, email: ${userEmail}, dbId: ${dbId}`);
+    
+    // First try to get existing user
+    let user;
+    try {
+      user = await userStoreService.getUserByEmail(userEmail);
+      if (user) {
+        // Update existing user
+        await userStoreService.updateUserNotionDb(user.id, dbId);
+        console.log(`Updated existing user ${user.id} with database ID: ${dbId}`);
+        return res.json({
+          success: true,
+          message: 'User updated successfully',
+          userId: user.id,
+          email: userEmail,
+          notionDbId: dbId
+        });
+      }
+    } catch (error) {
+      console.log('User not found, creating new user');
+    }
+    
+    // Create new user using createOrGetUser
+    const newUser = await userStoreService.createOrGetUser(userEmail, 'test-token', dbId);
+    console.log(`Created new user with ID: ${newUser.id}`);
+    
+    // Add the store to the user
+    await userStoreService.addStoreToUser(newUser.id, shopName, shop, 'test-access-token');
+    
+    return res.json({
+      success: true,
+      message: 'Test user created successfully',
+      userId: newUser.id,
+      email: userEmail,
+      notionDbId: dbId
+    });
+    
+  } catch (error) {
+    console.error('Error creating test user:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create test user'
+    });
+  }
+});
+
 export default router; 
