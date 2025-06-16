@@ -247,9 +247,9 @@ app.get('/app', (req: express.Request, res: express.Response) => {
                   <div style="flex: 1;">
                     <strong>Paste your new database URL</strong>
                     <div style="margin-top: 8px;">
-                      <input type="url" id="databaseUrl" placeholder="https://www.notion.so/your-database-id"
+                      <input type="url" id="databaseUrl" placeholder="https://your-workspace.notion.site/your-database-id"
                              style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 14px;"
-                             onchange="validateDatabaseUrl()"/>
+                             oninput="validateDatabaseUrl()" onchange="validateDatabaseUrl()"/>
                     </div>
                     <div style="margin-top: 6px; font-size: 11px; color: #9ca3af; font-style: italic;">
                       💡 After duplicating, copy the URL from your browser's address bar
@@ -656,7 +656,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           
           if (urlInput && connectBtn) {
             const url = urlInput.value.trim();
-            if (url && url.includes('notion.so/')) {
+            if (url && (url.includes('notion.so/') || url.includes('notion.site/'))) {
               connectBtn.disabled = false;
               connectBtn.style.background = '#38a169';
             } else {
@@ -676,7 +676,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           }
 
           const url = urlInput.value.trim();
-          if (!url.includes('notion.so/')) {
+          if (!url.includes('notion.so/') && !url.includes('notion.site/')) {
             alert('Please enter a valid Notion database URL');
             return;
           }
