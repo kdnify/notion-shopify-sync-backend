@@ -578,10 +578,10 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
       return res.redirect(`${appUrl}/app?shop=unknown&error=${encodeURIComponent('Invalid state parameter')}`);
     }
 
-    const { shop: shopDomain, userId, sessionId } = stateData;
+    const { shop: shopDomain, userId, sessionId, dbId } = stateData;
     const shopName = shopDomain.replace('.myshopify.com', '');
 
-    console.log(`🔑 Processing Notion OAuth for user: ${userId}, shop: ${shopName}`);
+    console.log(`🔑 Processing Notion OAuth for user: ${userId}, shop: ${shopName}, dbId: ${dbId || 'auto-create'}`);
 
     // Exchange code for access token
     const clientId = process.env.NOTION_OAUTH_CLIENT_ID || '212d872b-594c-80fd-ae95-0037202a219e';
@@ -617,7 +617,43 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
     const tokenData = await tokenResponse.json() as any;
     console.log('✅ Got Notion access token');
 
-    // 🎯 SEAMLESS DATABASE CREATION
+    // Check if this is simplified flow (user provided database) or auto-create flow
+    if (dbId) {
+      // 🎯 SIMPLIFIED FLOW - User provided their own database
+      console.log(`🔗 Connecting to user-provided database: ${dbId}`);
+      
+      try {
+        // Update user with their database ID
+        const updateSuccess = await userStoreService.updateUserNotionDb(userId, dbId);
+        console.log(`📊 Updated user ${userId} with database: ${dbId} - Success: ${updateSuccess}`);
+        
+        // Test database access
+        const NotionService = require('../services/notion').default;
+        const testNotionService = new NotionService(tokenData.access_token, dbId);
+        const canAccess = await testNotionService.testConnection();
+        
+        if (!canAccess) {
+          throw new Error('Cannot access the database - make sure it exists and you have access');
+        }
+        
+        console.log('✅ Database access confirmed');
+        
+        // 🎉 SUCCESS - Redirect to completion page
+        const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+        const completionUrl = `${appUrl}/complete?shop=${shopDomain}&session=${sessionId}`;
+        
+        console.log(`🎉 SETUP COMPLETE! Redirecting to: ${completionUrl}`);
+        res.redirect(completionUrl);
+        return;
+        
+      } catch (dbError) {
+        console.error('❌ Database connection test failed:', dbError);
+        const appUrl = process.env.SHOPIFY_APP_URL || `${req.protocol}://${req.get('host')}`;
+        return res.redirect(`${appUrl}/app?shop=${shopDomain}&error=${encodeURIComponent('Cannot access your database. Please check the URL and try again.')}`);
+      }
+    }
+
+    // 🎯 SEAMLESS DATABASE CREATION (original flow)
     try {
       console.log(`🏗️ Creating personal Notion database for ${shopName}...`);
       
@@ -1183,7 +1219,7 @@ router.get('/connect-database', async (req: Request, res: Response) => {
     
     // Notion OAuth configuration
     const clientId = process.env.NOTION_OAUTH_CLIENT_ID || '212d872b-594c-80fd-ae95-0037202a219e';
-    const redirectUri = 'https://notion-shopify-sync-backend.onrender.com/auth/notion-callback-simple';
+    const redirectUri = 'https://notion-shopify-sync-backend.onrender.com/auth/notion-callback';
     
     const state = encodeURIComponent(JSON.stringify({
       shop: shop,
