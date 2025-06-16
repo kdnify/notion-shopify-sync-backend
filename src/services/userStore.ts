@@ -77,6 +77,13 @@ class UserStoreService {
   }
 
   /**
+   * Update Notion Token for a user
+   */
+  updateUserNotionToken(userId: string, notionToken: string): Promise<boolean> {
+    return databaseService.updateUserNotionToken(userId, notionToken);
+  }
+
+  /**
    * Get stats
    */
   async getStats(): Promise<{ totalUsers: number; totalStores: number }> {

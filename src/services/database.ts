@@ -335,6 +335,26 @@ class DatabaseService {
     }
   }
 
+  async updateUserNotionToken(userId: string, notionToken: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const result = await this.db.run(
+        'UPDATE users SET notion_token = ? WHERE id = ?',
+        [notionToken, userId]
+      );
+
+      if (result.changes && result.changes > 0) {
+        console.log(`🔑 Updated Notion token for user ${userId}`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ Error updating user Notion token:', error);
+      return false;
+    }
+  }
+
   async getStats(): Promise<{ totalUsers: number; totalStores: number; migrations: { pending: number; completed: number } }> {
     if (!this.db) throw new Error('Database not initialized');
 

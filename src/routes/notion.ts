@@ -1,6 +1,7 @@
 import express from 'express';
 import { Client } from '@notionhq/client';
 import { userStoreService } from '../services/userStore';
+import { Request, Response } from 'express';
 
 const router = express.Router();
 
@@ -550,6 +551,81 @@ router.post('/create-template-db', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to create template database',
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /notion/test-db-access
+ * Test if system token can access a specific database
+ */
+router.post('/test-db-access', async (req: Request, res: Response) => {
+  try {
+    const { dbId } = req.body;
+    
+    if (!dbId) {
+      return res.status(400).json({
+        error: 'Missing database ID',
+        message: 'Please provide dbId in request body'
+      });
+    }
+    
+    if (!NOTION_TOKEN) {
+      return res.status(500).json({
+        error: 'System token not configured',
+        message: 'NOTION_TOKEN environment variable is required'
+      });
+    }
+    
+    console.log(`🧪 Testing access to database: ${dbId}`);
+    
+    // Try to query the database
+    const response = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${NOTION_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        page_size: 1
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json() as any;
+      console.log(`✅ Successfully accessed database ${dbId}`);
+      
+      res.json({
+        success: true,
+        message: 'Database access successful',
+        data: {
+          dbId: dbId,
+          resultCount: data.results?.length || 0,
+          hasAccess: true
+        }
+      });
+    } else {
+      const errorData = await response.json() as any;
+      console.log(`❌ Failed to access database ${dbId}:`, errorData);
+      
+      res.json({
+        success: false,
+        message: 'Database access failed',
+        error: errorData.message || 'Unknown error',
+        data: {
+          dbId: dbId,
+          hasAccess: false,
+          statusCode: response.status
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error testing database access:', error);
+    res.status(500).json({
+      error: 'Test failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
