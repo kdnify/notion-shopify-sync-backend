@@ -1739,4 +1739,72 @@ function getPopupCloseHtml(shop: string, session: string, message: string = 'Suc
     </html>`;
 }
 
+/**
+ * GET /auth/fix-user-db
+ * Debug endpoint to manually fix user's database ID
+ */
+router.get('/fix-user-db', async (req: Request, res: Response) => {
+  try {
+    const { shop, dbId } = req.query;
+    
+    if (!shop || !dbId) {
+      return res.status(400).json({
+        error: 'Missing parameters',
+        message: 'Requires ?shop=SHOP&dbId=DATABASE_ID'
+      });
+    }
+    
+    const shopName = (shop as string).replace('.myshopify.com', '');
+    
+    // Get user by email (shop-based email)
+    const userEmail = `${shopName}@shopify.local`;
+    const user = await userStoreService.getUserByEmail(userEmail);
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: `No user found with email ${userEmail}`
+      });
+    }
+    
+    console.log(`🔧 Fixing database ID for user ${user.id} (${userEmail})`);
+    console.log(`🔧 Old DB ID: "${user.notionDbId}"`);
+    console.log(`🔧 New DB ID: "${dbId}"`);
+    
+    // Update the database ID
+    const success = await userStoreService.updateUserNotionDb(user.id, dbId as string);
+    
+    if (success) {
+      console.log(`✅ Successfully updated database ID for ${user.id}`);
+      
+      // Verify the update
+      const updatedUser = await userStoreService.getUser(user.id);
+      
+      return res.json({
+        success: true,
+        message: 'Database ID updated successfully',
+        data: {
+          userId: user.id,
+          email: userEmail,
+          oldDbId: user.notionDbId,
+          newDbId: updatedUser?.notionDbId,
+          verified: updatedUser?.notionDbId === dbId
+        }
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Update failed',
+        message: 'Failed to update database ID'
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error fixing user database:', error);
+    res.status(500).json({
+      error: 'Internal Error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
