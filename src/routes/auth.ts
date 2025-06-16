@@ -1540,4 +1540,55 @@ router.post('/sync-historical', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /auth/get-or-create-session
+ * Get or create a session for the current shop
+ */
+router.get('/get-or-create-session', async (req: Request, res: Response) => {
+  try {
+    const { shop } = req.query;
+    
+    if (!shop) {
+      return res.status(400).json({
+        error: 'Missing required parameter: shop'
+      });
+    }
+
+    const shopName = (shop as string).replace('.myshopify.com', '');
+    console.log(`🔑 Getting or creating session for shop: ${shopName}`);
+
+    // Get existing user or create one with dummy credentials
+    let user = await userStoreService.getUserByEmail(`${shopName}@shop.local`);
+    
+    if (!user) {
+      console.log(`👤 Creating new user for shop: ${shopName}`);
+      // Create user with placeholder credentials that will be updated later
+      user = await userStoreService.createOrGetUser(`${shopName}@shop.local`, 'placeholder-token', 'placeholder-db');
+    }
+
+    if (!user) {
+      return res.status(500).json({
+        error: 'Failed to create or get user'
+      });
+    }
+
+    // Create a new session
+    const sessionId = await userStoreService.createSession(user.id);
+    console.log(`✅ Created session ${sessionId} for user ${user.id}`);
+
+    res.json({
+      success: true,
+      sessionId: sessionId,
+      userId: user.id
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting or creating session:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to get or create session'
+    });
+  }
+});
+
 export default router; 

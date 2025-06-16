@@ -701,9 +701,26 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           }
 
           // Start the Notion OAuth process with the database ID
-          const urlParams = new URLSearchParams(window.location.search);
-          const session = urlParams.get('session') || '${session}' || 'embedded-app-session';
-          window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+          // Try to get a fresh session by creating one for the current shop
+          try {
+            const response = await fetch('/auth/get-or-create-session?shop=${shop}');
+            if (response.ok) {
+              const sessionData = await response.json();
+              const session = sessionData.sessionId || 'embedded-app-session';
+              window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+            } else {
+              // Fallback to URL session
+              const urlParams = new URLSearchParams(window.location.search);
+              const session = urlParams.get('session') || '${session || "embedded-session"}' || 'embedded-app-session';
+              window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+            }
+          } catch (error) {
+            console.error('Failed to get session:', error);
+            // Fallback to URL session
+            const urlParams = new URLSearchParams(window.location.search);
+            const session = urlParams.get('session') || '${session || "embedded-session"}' || 'embedded-app-session';
+            window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+          }
         }
 
         // Add event listeners
