@@ -916,35 +916,36 @@ router.get('/inspect-db', async (req: Request, res: Response) => {
 
 /**
  * POST /webhooks/debug-n8n
- * Debug endpoint to see exactly what n8n is sending
+ * Debug endpoint to test n8n data reception
  */
 router.post('/debug-n8n', async (req: Request, res: Response) => {
   try {
-    console.log('🔍 DEBUG: Raw n8n data received');
-    console.log('📋 Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('🐛 Debug endpoint called');
     console.log('📋 Body:', JSON.stringify(req.body, null, 2));
+    console.log('📋 Headers:', JSON.stringify(req.headers, null, 2));
     
-    const orderData = req.body;
-    
-    // Log each field individually
-    console.log('🔍 Individual field analysis:');
-    Object.keys(orderData).forEach(key => {
-      console.log(`  ${key}: ${JSON.stringify(orderData[key])} (type: ${typeof orderData[key]})`);
-    });
+    const data = req.body;
     
     res.json({
       success: true,
-      message: 'Debug data logged successfully',
-      receivedData: orderData,
-      fieldCount: Object.keys(orderData).length,
-      fields: Object.keys(orderData)
+      message: 'Debug data received',
+      data: {
+        bodyType: typeof data,
+        bodyConstructor: data?.constructor?.name,
+        hasOrderId: !!data.orderId,
+        hasShopDomain: !!data.shopDomain,
+        orderId: data.orderId,
+        shopDomain: data.shopDomain,
+        keys: Object.keys(data || {}),
+        fullBody: data
+      }
     });
     
   } catch (error) {
-    console.error('❌ Error in debug-n8n endpoint:', error);
+    console.error('❌ Debug endpoint error:', error);
     res.status(500).json({
-      error: 'Failed to process debug request',
-      details: error instanceof Error ? error.message : String(error)
+      error: 'Debug failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
