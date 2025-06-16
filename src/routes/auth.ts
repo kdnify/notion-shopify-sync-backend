@@ -1647,4 +1647,56 @@ router.get('/test-db-update', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /auth/create-user-for-test
+ * Create a user for testing webhook functionality
+ */
+router.post('/create-user-for-test', async (req: Request, res: Response) => {
+  try {
+    const { shop, dbId } = req.body;
+    
+    if (!shop || !dbId) {
+      return res.status(400).json({
+        error: 'Missing parameters',
+        message: 'Requires shop and dbId in request body'
+      });
+    }
+    
+    const shopName = shop.replace('.myshopify.com', '');
+    const userEmail = `${shopName}@shopify.local`;
+    
+    console.log(`🧪 Creating test user: ${userEmail} with database: ${dbId}`);
+    
+    // Create user with the system token and provided database ID
+    const user = await userStoreService.createOrGetUser(
+      userEmail,
+      process.env.NOTION_TOKEN || 'system-token',
+      dbId
+    );
+    
+    // Connect the store to the user
+    await userStoreService.addStoreToUser(user.id, shopName, shop, 'test-access-token');
+    
+    console.log(`✅ Created user ${user.id} with database ${dbId} and connected store ${shopName}`);
+    
+    res.json({
+      success: true,
+      message: 'Test user created successfully',
+      data: {
+        userId: user.id,
+        email: userEmail,
+        dbId: dbId,
+        shop: shopName
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error creating test user:', error);
+    res.status(500).json({
+      error: 'Failed to create user',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router; 
