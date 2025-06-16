@@ -707,19 +707,25 @@ app.get('/app', (req: express.Request, res: express.Response) => {
             if (response.ok) {
               const sessionData = await response.json();
               const session = sessionData.sessionId || 'embedded-app-session';
-              window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+              const oauthUrl = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+              // Open OAuth in new window instead of current frame
+              window.open(oauthUrl, '_blank', 'width=600,height=700');
             } else {
               // Fallback to URL session
               const urlParams = new URLSearchParams(window.location.search);
               const session = urlParams.get('session') || '${session || "embedded-session"}' || 'embedded-app-session';
-              window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+              const oauthUrl = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+              // Open OAuth in new window instead of current frame
+              window.open(oauthUrl, '_blank', 'width=600,height=700');
             }
           } catch (error) {
             console.error('Failed to get session:', error);
             // Fallback to URL session
             const urlParams = new URLSearchParams(window.location.search);
             const session = urlParams.get('session') || '${session || "embedded-session"}' || 'embedded-app-session';
-            window.location.href = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+            const oauthUrl = '/auth/connect-database?shop=${shop}&session=' + encodeURIComponent(session) + '&dbId=' + encodeURIComponent(dbId);
+            // Open OAuth in new window instead of current frame
+            window.open(oauthUrl, '_blank', 'width=600,height=700');
           }
         }
 
@@ -786,6 +792,17 @@ app.get('/app', (req: express.Request, res: express.Response) => {
           const backFromConnectBtn = document.getElementById('backFromConnectBtn');
           if (backFromConnectBtn) {
             backFromConnectBtn.addEventListener('click', showDatabaseChoice);
+          }
+        });
+
+        // Listen for messages from OAuth popup
+        window.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'NOTION_OAUTH_SUCCESS') {
+            console.log('Received OAuth success message:', event.data);
+            // Refresh the app to show the connected state
+            setTimeout(() => {
+              initializeApp();
+            }, 1000);
           }
         });
 

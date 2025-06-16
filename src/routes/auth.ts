@@ -1437,9 +1437,30 @@ router.get('/complete', async (req: Request, res: Response) => {
         </div>
 
         <script>
+            // Check if we're in a popup window
+            if (window.opener && window.opener !== window) {
+                // We're in a popup - notify parent and close
+                console.log('In popup - notifying parent and closing');
+                
+                // Post message to parent window
+                window.opener.postMessage({
+                    type: 'NOTION_OAUTH_SUCCESS',
+                    shop: '${shop}',
+                    session: '${session}'
+                }, '*');
+                
+                // Close popup after a short delay
+                setTimeout(() => {
+                    window.close();
+                }, 2000);
+                
+                // Show brief message
+                document.body.innerHTML = '<div style="text-align: center; padding: 50px; font-family: Arial;"><h2>✅ Success!</h2><p>Closing window...</p></div>';
+            }
+            
             function syncLastMonth() {
                 if (confirm('This will import the last 30 days of orders. Continue?')) {
-                                         fetch('/auth/sync-historical?shop=${shop}&session=${session}&days=30', {
+                    fetch('/auth/sync-historical?shop=${shop}&session=${session}&days=30', {
                         method: 'POST'
                     })
                     .then(response => response.json())
