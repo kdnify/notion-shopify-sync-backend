@@ -1871,4 +1871,54 @@ router.post('/create-test-user', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /auth/delete-test-user
+ * Delete a test user to restore proper flow
+ */
+router.delete('/delete-test-user', async (req: Request, res: Response) => {
+  try {
+    const { shop } = req.query;
+    
+    if (!shop) {
+      return res.status(400).json({
+        error: 'Missing parameters',
+        message: 'Requires ?shop=SHOP_DOMAIN'
+      });
+    }
+    
+    const shopName = (shop as string).replace('.myshopify.com', '');
+    const userEmail = `${shopName}@shopify.local`;
+    
+    console.log(`Deleting test user for shop: ${shop}, email: ${userEmail}`);
+    
+    // Get user by email
+    const user = await userStoreService.getUserByEmail(userEmail);
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: `No user found with email ${userEmail}`
+      });
+    }
+    
+    // Note: We don't have a delete method in the service, so we'll update the user to have empty database
+    await userStoreService.updateUserNotionDb(user.id, '');
+    console.log(`Cleared database ID for user ${user.id}`);
+    
+    return res.json({
+      success: true,
+      message: 'Test user database cleared successfully',
+      userId: user.id,
+      email: userEmail
+    });
+    
+  } catch (error) {
+    console.error('Error deleting test user:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete test user'
+    });
+  }
+});
+
 export default router; 
