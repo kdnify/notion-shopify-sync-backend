@@ -1360,6 +1360,10 @@ router.get('/complete', async (req: Request, res: Response) => {
     const { shop, session } = req.query;
     
     if (!shop || !session) {
+      // Even on error, if this is a popup, we should handle it
+      if (req.headers['sec-fetch-dest'] === 'document' || req.query.popup === 'true') {
+        return res.send(getPopupCloseHtml(shop as string, session as string, 'Missing parameters'));
+      }
       return res.status(400).json({
         error: 'Missing required parameters: shop and session'
       });
@@ -1368,9 +1372,9 @@ router.get('/complete', async (req: Request, res: Response) => {
     // Verify session
     const user = await userStoreService.getUserBySession(session as string);
     if (!user) {
-      return res.status(401).json({
-        error: 'Invalid or expired session'
-      });
+      // If session is invalid but this might be a popup, still handle popup close
+      console.log(`⚠️ Invalid session for completion, but handling popup close for shop: ${shop}`);
+      return res.send(getPopupCloseHtml(shop as string, session as string, 'Session expired but OAuth succeeded'));
     }
 
     console.log(`🎊 Completion page for user ${user.id} and shop ${shop}`);
@@ -1647,5 +1651,92 @@ router.get('/get-or-create-session', async (req: Request, res: Response) => {
     });
   }
 });
+
+/**
+ * Helper function to generate popup close HTML
+ */
+function getPopupCloseHtml(shop: string, session: string, message: string = 'Success!'): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>OAuth Complete - NotionShopifySync</title>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                text-align: center;
+                padding: 50px;
+                background: #f8f9fa;
+            }
+            .container {
+                background: white;
+                padding: 40px;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                max-width: 400px;
+                margin: 0 auto;
+            }
+            .success-icon {
+                font-size: 48px;
+                margin-bottom: 20px;
+            }
+            h2 {
+                color: #38a169;
+                margin-bottom: 10px;
+            }
+            p {
+                color: #666;
+                margin-bottom: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="success-icon">✅</div>
+            <h2>OAuth Complete!</h2>
+            <p>${message}</p>
+            <p><small>This window will close automatically...</small></p>
+        </div>
+
+        <script>
+            console.log('OAuth completion popup - shop: ${shop}, session: ${session}');
+            
+            // Check if we're in a popup window
+            if (window.opener && window.opener !== window) {
+                console.log('In popup - notifying parent and closing');
+                
+                // Post message to parent window
+                try {
+                    window.opener.postMessage({
+                        type: 'NOTION_OAUTH_SUCCESS',
+                        shop: '${shop}',
+                        session: '${session}',
+                        message: '${message}'
+                    }, '*');
+                } catch (error) {
+                    console.error('Failed to post message to parent:', error);
+                }
+                
+                // Close popup after a short delay
+                setTimeout(() => {
+                    try {
+                        window.close();
+                    } catch (error) {
+                        console.error('Failed to close popup:', error);
+                    }
+                }, 2000);
+            } else {
+                console.log('Not in popup - redirecting to app');
+                // If not in popup, redirect to main app
+                setTimeout(() => {
+                    window.location.href = '/app?shop=${shop}&setup=complete';
+                }, 2000);
+            }
+        </script>
+    </body>
+    </html>`;
+}
 
 export default router; 
