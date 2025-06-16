@@ -1815,17 +1815,17 @@ router.post('/create-test-user', async (req: Request, res: Response) => {
   try {
     const { shop, dbId } = req.body;
     
-    if (!shop || !dbId) {
+    if (!shop) {
       return res.status(400).json({
         error: 'Missing parameters',
-        message: 'Requires shop and dbId in request body'
+        message: 'Requires shop in request body'
       });
     }
     
     const shopName = shop.replace('.myshopify.com', '');
     const userEmail = `${shopName}@shopify.local`;
     
-    console.log(`Creating test user for shop: ${shop}, email: ${userEmail}, dbId: ${dbId}`);
+    console.log(`Creating test user for shop: ${shop}, email: ${userEmail}, dbId: ${dbId || 'empty'}`);
     
     // First try to get existing user
     let user;
@@ -1833,23 +1833,25 @@ router.post('/create-test-user', async (req: Request, res: Response) => {
       user = await userStoreService.getUserByEmail(userEmail);
       if (user) {
         // Update existing user
-        await userStoreService.updateUserNotionDb(user.id, dbId);
-        console.log(`Updated existing user ${user.id} with database ID: ${dbId}`);
+        await userStoreService.updateUserNotionDb(user.id, dbId || '');
+        console.log(`Updated existing user ${user.id} with database ID: ${dbId || 'empty'}`);
+        
         return res.json({
           success: true,
-          message: 'User updated successfully',
+          message: 'Test user updated successfully',
           userId: user.id,
           email: userEmail,
-          notionDbId: dbId
+          dbId: dbId || '',
+          hasDatabase: !!(dbId)
         });
       }
     } catch (error) {
-      console.log('User not found, creating new user');
+      console.log('User not found, will create new one');
     }
     
-    // Create new user using createOrGetUser
-    const newUser = await userStoreService.createOrGetUser(userEmail, 'test-token', dbId);
-    console.log(`Created new user with ID: ${newUser.id}`);
+    // Create new user with UserStoreService
+    const newUser = await userStoreService.createOrGetUser(userEmail, 'test-token', dbId || '');
+    console.log(`Created new user: ${newUser.id}`);
     
     // Add the store to the user
     await userStoreService.addStoreToUser(newUser.id, shopName, shop, 'test-access-token');
@@ -1859,7 +1861,8 @@ router.post('/create-test-user', async (req: Request, res: Response) => {
       message: 'Test user created successfully',
       userId: newUser.id,
       email: userEmail,
-      notionDbId: dbId
+      dbId: dbId || '',
+      hasDatabase: !!(dbId)
     });
     
   } catch (error) {
