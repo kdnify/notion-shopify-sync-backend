@@ -31,7 +31,11 @@ app.use(helmet({
 }));
 
 // Body parser middleware - Raw for webhook verification
-app.use('/webhooks', bodyParser.raw({ type: 'application/json' }));
+app.use('/webhooks/orders', bodyParser.raw({ type: 'application/json' }));
+
+// JSON body parser for n8n webhooks
+app.use('/webhooks/n8n-orders', bodyParser.json());
+app.use('/webhooks/debug-n8n', bodyParser.json());
 
 // JSON body parser for other routes
 app.use(bodyParser.json());
