@@ -7,14 +7,14 @@ export class NotionService {
 
   constructor(customToken?: string, customDatabaseId?: string) {
     const notionToken = customToken || process.env.NOTION_TOKEN;
-    const databaseId = customDatabaseId || process.env.NOTION_DB_ID;
+    const databaseId = customDatabaseId;
 
     if (!notionToken) {
       throw new Error('NOTION_TOKEN environment variable or custom token is required');
     }
 
     if (!databaseId) {
-      throw new Error('NOTION_DB_ID environment variable or custom database ID is required');
+      throw new Error('Database ID is required - no fallback to shared database allowed');
     }
 
     this.notion = new Client({

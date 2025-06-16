@@ -43,8 +43,6 @@ router.get('/', (req: Request, res: Response) => {
     // Store user info in state for callback
     const state = JSON.stringify({
       email: email || '',
-      notionToken: notionToken || process.env.NOTION_TOKEN || '',
-      notionDbId: notionDbId || process.env.NOTION_DB_ID || '',
       source: source || 'direct' // Track if this is from setup flow
     });
     
@@ -104,7 +102,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     const shopName = (shop as string).replace('.myshopify.com', '');
 
     // Parse state to get user info
-    let userInfo = { email: '', notionToken: '', notionDbId: '', source: 'direct' };
+    let userInfo = { email: '', source: 'direct' };
     if (state && typeof state === 'string') {
       try {
         userInfo = JSON.parse(state);
@@ -632,9 +630,17 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         const updateSuccess = await userStoreService.updateUserNotionDb(userId, dbId);
         console.log(`📊 Update result: ${updateSuccess}`);
         
+        // 🔑 CRITICAL: Save user's personal OAuth token
+        const tokenUpdateSuccess = await userStoreService.updateUserNotionToken(userId, tokenData.access_token);
+        console.log(`🔑 Updated user ${userId} with personal OAuth token - Success: ${tokenUpdateSuccess}`);
+        
         if (!updateSuccess) {
           console.error(`❌ Failed to update user ${userId} with database ${dbId}`);
           throw new Error('Failed to save database ID to user record');
+        }
+        
+        if (!tokenUpdateSuccess) {
+          console.warn(`⚠️ Failed to save user's OAuth token - they may not be able to access their database`);
         }
         
         // Verify the update worked
@@ -691,12 +697,12 @@ router.get('/notion-callback', async (req: Request, res: Response) => {
         const updateSuccess = await userStoreService.updateUserNotionDb(userId, dbResult.dbId);
         console.log(`📊 Updated user ${userId} with personal database: ${dbResult.dbId} - Success: ${updateSuccess}`);
         
-        // Also update the user's Notion token for future API calls
-        try {
-          // We need to add a method to update the user's Notion token
-          console.log(`🔑 User now has personal Notion access for database operations`);
-        } catch (tokenUpdateError) {
-          console.warn(`⚠️ Could not update user token:`, tokenUpdateError);
+        // 🔑 CRITICAL: Update user's personal OAuth token
+        const tokenUpdateSuccess = await userStoreService.updateUserNotionToken(userId, tokenData.access_token);
+        console.log(`🔑 Updated user ${userId} with personal OAuth token - Success: ${tokenUpdateSuccess}`);
+        
+        if (!tokenUpdateSuccess) {
+          console.warn(`⚠️ Failed to save user's OAuth token - they may not be able to access their database`);
         }
         
         // 🎉 SUCCESS - Redirect to app with success message
@@ -896,101 +902,6 @@ router.post('/manual-connect', async (req: Request, res: Response) => {
     console.error('❌ Error in manual connect:', error);
     res.status(500).json({
       error: 'Failed to manually connect store',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-/**
- * GET /auth/debug-fix-user - Direct database fix (no session required)
- */
-router.get('/debug-fix-user', async (req: Request, res: Response) => {
-  try {
-    const shopName = req.query.shop as string || 'testcrump1';
-    const notionDbId = req.query.db as string || '213e8f5a-c14a-8194-8fac-fc2397a6d283';
-
-    console.log(`🔧 DEBUG: Attempting to fix user for shop: ${shopName} with database: ${notionDbId}`);
-
-    // Update the environment variable directly (this is hacky but will work)
-    process.env.NOTION_DB_ID = notionDbId;
-    console.log(`✅ Updated NOTION_DB_ID to: ${notionDbId}`);
-
-    res.json({
-      success: true,
-      message: `Fixed user connection for ${shopName}`,
-      data: {
-        shopName,
-        notionDbId,
-        action: 'Environment variable updated'
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error in debug fix:', error);
-    res.status(500).json({
-      error: 'Failed to fix user',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-/**
- * POST /auth/force-connect
- * Force connect a shop to a database (bypasses all session checks)
- */
-router.post('/force-connect', async (req: Request, res: Response) => {
-  try {
-    const { shopName, notionDbId, email } = req.body;
-
-    if (!shopName || !notionDbId) {
-      return res.status(400).json({
-        error: 'Missing required fields: shopName and notionDbId'
-      });
-    }
-
-    console.log(`🔧 FORCE CONNECT: ${shopName} → ${notionDbId}`);
-
-    const userEmail = email || `${shopName}@shopify.local`;
-    
-    // Create user with the database ID directly
-    const user = await userStoreService.createOrGetUser(
-      userEmail,
-      process.env.NOTION_TOKEN || '',
-      notionDbId
-    );
-
-    console.log(`✅ Created/got user: ${user.id}`);
-
-    // Force add store connection
-    await userStoreService.addStoreToUser(
-      user.id,
-      shopName,
-      `${shopName}.myshopify.com`,
-      process.env.SHOPIFY_ACCESS_TOKEN || 'dummy-token'
-    );
-
-    console.log(`🔗 Force connected ${shopName} to user ${user.id}`);
-
-    // Verify it worked
-    const verification = await userStoreService.getAllUsersWithStore(shopName);
-    console.log(`🔍 Verification: Found ${verification.length} users with store ${shopName}`);
-
-    res.json({
-      success: true,
-      message: `Force connected ${shopName} to database ${notionDbId}`,
-      data: {
-        userId: user.id,
-        shopName,
-        notionDbId,
-        userEmail,
-        verification: verification.length
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error in force connect:', error);
-    res.status(500).json({
-      error: 'Failed to force connect',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -1328,11 +1239,29 @@ router.get('/notion-callback-simple', async (req: Request, res: Response) => {
     const tokenData = await tokenResponse.json() as any;
     console.log('✅ Got Notion access token');
 
-    // Update user with their database ID and token
+    // Update user with their database ID
+    console.log(`📊 Attempting to update user ${userId} with database: ${dbId}`);
     const updateSuccess = await userStoreService.updateUserNotionDb(userId, dbId);
-    console.log(`📊 Updated user ${userId} with database: ${dbId} - Success: ${updateSuccess}`);
+    console.log(`📊 Update result: ${updateSuccess}`);
     
-    // Test database access to make sure it works
+    // 🔑 CRITICAL: Save user's personal OAuth token
+    const tokenUpdateSuccess = await userStoreService.updateUserNotionToken(userId, tokenData.access_token);
+    console.log(`🔑 Updated user ${userId} with personal OAuth token - Success: ${tokenUpdateSuccess}`);
+    
+    if (!updateSuccess) {
+      console.error(`❌ Failed to update user ${userId} with database ${dbId}`);
+      throw new Error('Failed to save database ID to user record');
+    }
+    
+    if (!tokenUpdateSuccess) {
+      console.warn(`⚠️ Failed to save user's OAuth token - they may not be able to access their database`);
+    }
+    
+    // Verify the update worked
+    const updatedUser = await userStoreService.getUser(userId);
+    console.log(`🔍 Verification - Updated user database ID: ${updatedUser?.notionDbId}`);
+    
+    // Test database access
     try {
       const { NotionService } = require('../services/notion');
       const testNotionService = new NotionService(tokenData.access_token, dbId);
@@ -1695,6 +1624,68 @@ router.post('/create-user-for-test', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Failed to create user',
       message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /auth/force-connect
+ * Force connect a shop to a database (bypasses all session checks)
+ */
+router.post('/force-connect', async (req: Request, res: Response) => {
+  try {
+    const { shopName, notionDbId, email } = req.body;
+
+    if (!shopName || !notionDbId) {
+      return res.status(400).json({
+        error: 'Missing required fields: shopName and notionDbId'
+      });
+    }
+
+    console.log(`🔧 FORCE CONNECT: ${shopName} → ${notionDbId}`);
+
+    const userEmail = email || `${shopName}@shopify.local`;
+    
+    // Create user with the database ID directly
+    const user = await userStoreService.createOrGetUser(
+      userEmail,
+      process.env.NOTION_TOKEN || '',
+      notionDbId
+    );
+
+    console.log(`✅ Created/got user: ${user.id}`);
+
+    // Force add store connection
+    await userStoreService.addStoreToUser(
+      user.id,
+      shopName,
+      `${shopName}.myshopify.com`,
+      process.env.SHOPIFY_ACCESS_TOKEN || 'dummy-token'
+    );
+
+    console.log(`🔗 Force connected ${shopName} to user ${user.id}`);
+
+    // Verify it worked
+    const verification = await userStoreService.getAllUsersWithStore(shopName);
+    console.log(`🔍 Verification: Found ${verification.length} users with store ${shopName}`);
+
+    res.json({
+      success: true,
+      message: `Force connected ${shopName} to database ${notionDbId}`,
+      data: {
+        userId: user.id,
+        shopName,
+        notionDbId,
+        userEmail,
+        verification: verification.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in force connect:', error);
+    res.status(500).json({
+      error: 'Failed to force connect',
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });

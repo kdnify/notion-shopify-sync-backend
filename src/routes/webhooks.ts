@@ -10,10 +10,9 @@ const router = Router();
 let notionService: NotionService;
 
 try {
-  console.log('🔧 Initializing Notion service...');
+  console.log('🔧 Initializing webhook service...');
   console.log('📋 NOTION_TOKEN exists:', !!process.env.NOTION_TOKEN);
-  console.log('📋 NOTION_DB_ID exists:', !!process.env.NOTION_DB_ID);
-  console.log('📋 NOTION_DB_ID value:', process.env.NOTION_DB_ID);
+  console.log('📋 NOTION_TEMPLATE_DB_ID exists:', !!process.env.NOTION_TEMPLATE_DB_ID);
   
   notionService = new NotionService();
   console.log('✅ Notion service initialized successfully');
@@ -202,8 +201,8 @@ router.get('/test', async (req: Request, res: Response) => {
     // Check environment variables
     const checks = {
       shopifySecret: !!process.env.SHOPIFY_WEBHOOK_SECRET,
-      notionToken: !!process.env.NOTION_TOKEN,
-      notionDbId: !!process.env.NOTION_DB_ID,
+              notionToken: !!process.env.NOTION_TOKEN,
+        notionTemplateDbId: !!process.env.NOTION_TEMPLATE_DB_ID,
       notionConnection: false
     };
 
@@ -700,7 +699,7 @@ router.get('/debug', async (req: Request, res: Response) => {
 
     const config = {
       notionToken: process.env.NOTION_TOKEN ? '***' + process.env.NOTION_TOKEN.slice(-4) : 'NOT SET',
-      notionDbId: process.env.NOTION_DB_ID || 'NOT SET',
+      notionTemplateDbId: process.env.NOTION_TEMPLATE_DB_ID ? 'SET' : 'NOT SET',
       shopifySecret: process.env.SHOPIFY_WEBHOOK_SECRET ? 'SET' : 'NOT SET',
       nodeEnv: process.env.NODE_ENV || 'NOT SET'
     };
@@ -821,12 +820,21 @@ router.post('/test-create', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /webhooks/inspect-db
+ * GET /webhooks/inspect-db?dbId=DATABASE_ID
  * Inspect the database structure and recent pages
  */
 router.get('/inspect-db', async (req: Request, res: Response) => {
   try {
     console.log('🔍 Database inspection endpoint called');
+
+    const { dbId } = req.query;
+    
+    if (!dbId) {
+      return res.status(400).json({
+        error: 'Missing database ID',
+        message: 'Please provide ?dbId=DATABASE_ID parameter'
+      });
+    }
 
     if (!notionService) {
       return res.status(500).json({
@@ -834,17 +842,16 @@ router.get('/inspect-db', async (req: Request, res: Response) => {
       });
     }
 
-    const dbId = process.env.NOTION_DB_ID;
     console.log(`🔍 Inspecting database: ${dbId}`);
 
     // Get database info
     const database = await notionService['notion'].databases.retrieve({
-      database_id: dbId!,
+      database_id: dbId as string,
     });
 
     // Get recent pages from the database
     const pages = await notionService['notion'].databases.query({
-      database_id: dbId!,
+      database_id: dbId as string,
       sorts: [
         {
           timestamp: 'created_time',
