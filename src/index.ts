@@ -173,6 +173,7 @@ app.get('/app', (req: express.Request, res: express.Response) => {
         <div class="header">
           <h1 class="title">🎯 NotionSync</h1>
           <p class="subtitle">Automatically sync your Shopify orders to Notion</p>
+          <!-- Cache refresh: v2.1 -->
         </div>
 
         ${errorMessage ? `
