@@ -11,6 +11,7 @@ import configRoutes from './routes/config';
 // Load environment variables
 dotenv.config();
 
+// Force deployment refresh - auth routes fix
 const app = express();
 const PORT = process.env.PORT || 3001;
 
