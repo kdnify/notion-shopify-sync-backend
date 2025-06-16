@@ -1131,7 +1131,7 @@ router.get('/setup', async (req: Request, res: Response) => {
                 }
                 
                 // Start the connection process
-                window.location.href = '/auth/connect-database?shop=${shop}&session=${session}&dbId=' + encodeURIComponent(dbId);
+                window.location.href = '/auth/connect-database?shop=' + encodeURIComponent('` + shop + `') + '&session=' + encodeURIComponent('` + session + `') + '&dbId=' + encodeURIComponent(dbId);
             }
         </script>
     </body>
